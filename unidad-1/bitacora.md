@@ -28,7 +28,7 @@ let x;
 function setup() {
     createCanvas(400, 400);
   
-    x = width / 2;78
+    x = width / 2;
     background(80);
     port = createSerial();
     connectBtn = createButton('Connect to micro:bit');
@@ -86,13 +86,13 @@ while True:
     if button_b.was_pressed():
         uart.write('B')
         sleep(500)
-## Bitácora de aplicación 
-
 ```
 #### Explica detalladamente cómo funciona el sistema físico interactivo que has creado.
-En el programa del microbit mantenemos las funciones de que al presionar los botones A y B, estos reciban información.
-Además de la variable del botón y el puerto, agregamos una variable de ubicación, que en la función del draw nos permitira dibujar el ciclo de acuerdo al botón que se presione.
+En el programa del microbit mantenemos la consulta de los botones A y B `button_a.is_pressed`, estos reciben información continua y cuando el estado es verdadero, se envía un caracter por serial.
+En el programa de p5.Js agregamos una variable global de posición `x` de nuestro sistema, que lo definimos en septup `x = width / 2;`, y así dibujar el circulo en el centro `ellipse(x, height / 2, 100, 100);`. En el draw el ciclo se ejecutara y el circulo se movera de acuerdo al botón que se presione.
+## Bitácora de aplicación 
 ## Bitácora de reflexión
+
 
 
 
