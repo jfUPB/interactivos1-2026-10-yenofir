@@ -89,9 +89,11 @@ while True:
 ## Bitácora de aplicación 
 
 ```
-####Explica detalladamente cómo funciona el sistema físico interactivo que has creado.
-
+#### Explica detalladamente cómo funciona el sistema físico interactivo que has creado.
+En el programa del microbit mantenemos las funciones de que al presionar los botones A y B, estos reciban información.
+Además de la variable del botón y el puerto, agregamos una variable de ubicación, que en la función del draw nos permitira dibujar el ciclo de acuerdo al botón que se presione.
 ## Bitácora de reflexión
+
 
 
 
