@@ -181,7 +181,7 @@ function draw() {
     rect(width / 2, height / 2, 50, 50);
 
 ```
-Si el puerto no esta habilitado se coneta con el boton de la microbit, si no el boton se desconecta.
+Si el puerto no esta habilitado se coneta con el boton de la microbit, si no no esta conectado; es decir, informa el estado del bontón.
 ```
   
     if (!port.opened()) {
@@ -206,6 +206,7 @@ Esta ultima función es para desconectar el microbit, si el puerto no esta abier
 ```
 ## Bitácora de aplicación 
 ## Bitácora de reflexión
+
 
 
 
