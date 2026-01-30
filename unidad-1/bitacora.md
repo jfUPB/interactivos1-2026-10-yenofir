@@ -190,7 +190,7 @@ function draw() {
   }
 
 ```
-Esta ultima función es para desconectar el microbit, si el puerto no esta abierto, ser abre y manda datos a la velocidad de 115200, y la coneción finaliza. Por ende se cierrra el puerto.
+Esta ultima función es para desconectar el microbit, si el puerto no esta abierto, ser abre y manda datos a la velocidad de 115200, y la conexión finaliza. Por ende se cierrra el puerto.
 ```
   function connectBtnClick() {
     if (!port.opened()) {
@@ -204,6 +204,7 @@ Esta ultima función es para desconectar el microbit, si el puerto no esta abier
 ```
 ## Bitácora de aplicación 
 ## Bitácora de reflexión
+
 
 
 
