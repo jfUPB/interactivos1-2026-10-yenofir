@@ -115,7 +115,6 @@ El circulo se movera hacía la derecha`x += 10;` si se presiona el botón A y a 
 Así pinta de nuevo el Canvas y el circulo. 
 
 ## ACTIVIDAD 06
-Vas a repasar lo aprendido en esta unidad. Regresa a la actividad 4 y trata de explicar en tus propias palabras de la manera más detallada que puedas cómo funciona el sistema físico interactivo. Analiza cada parte del código y su función dentro del sistema. Si aún tienes dudas sobre alguna parte, aprovecha para aclararlas.
 Explicación detallada del sistema de la actividad 4.
 
 #### Programa de micro:bit.
@@ -160,7 +159,7 @@ Llamaremos la conexión al botón para crear uno en el canvas que es el que da a
 En nuestro bucle draw volvemos a crear el canvas con las mismas carateristicas. Entonces si el puerto esta abierto(true) y la conexión no ha inicializado el puerto se limpia y la coneción se inicia. 
 Se habilita el puerto y si este me da un dato mayor a 0, leeremos el puerto en 1. Lo que nos dice que es igual al botón A y que activa el relleno en rojo. Si no entonces es igual a N que me deja el relleno verde. 
 Luego damos forma al sistema al cual le cargamos las características anteriores, en el centro se dibuja un cuadro verde en la mitad del canvas.
-Si el puerto no esta habilitado se coneta con el boton de la microbit, si no el boton se desconecta.
+
 ```
 function draw() {
     background(220);
@@ -178,10 +177,13 @@ function draw() {
         fill("green");
       }
     }
-
     rectMode(CENTER);
     rect(width / 2, height / 2, 50, 50);
 
+```
+Si el puerto no esta habilitado se coneta con el boton de la microbit, si no el boton se desconecta.
+```
+  
     if (!port.opened()) {
       connectBtn.html("Connect to micro:bit");
     } else {
@@ -190,7 +192,7 @@ function draw() {
   }
 
 ```
-Esta ultima función es para desconectar el microbit, si el puerto no esta abierto, ser abre y manda datos a la velocidad de 115200, y la conexión finaliza. Por ende se cierrra el puerto.
+Esta ultima función es para desconectar el microbit, si el puerto no esta abierto, manda datos a la velocidad de 115200 y la conexión finaliza. Por ende se cierrra el puerto.
 ```
   function connectBtnClick() {
     if (!port.opened()) {
@@ -204,6 +206,7 @@ Esta ultima función es para desconectar el microbit, si el puerto no esta abier
 ```
 ## Bitácora de aplicación 
 ## Bitácora de reflexión
+
 
 
 
