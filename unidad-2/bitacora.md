@@ -116,27 +116,35 @@ class Semaforo(FSMTask):
 
 ```
 ### Máquina de estados
-<img width="342" height="605" alt="image" src="https://github.com/user-attachments/assets/af8cb4e4-9c90-4132-ba83-c335470175be" />
+<img width="532" height="605" alt="image" src="https://github.com/user-attachments/assets/a6c533c7-c517-42bd-b141-40b9df06c9b4" />
+
 
 Implementación plantUML 
 ```
 @startuml
+title Semaforo - UML State Machine
 
+[*] --> WaitInRed : Semaforo() (constructor)
 
-title Pixel - UML State Machine
+WaitInRed : entry /\n  clear()\n  display.set_pixel(x,y,9)\n  myTimer.start(timeInRed = 2000ms)
 
-[*] --> WaitInRed : Pixel() (constructor)
-WaitInRed : entry /\n  pixelState = 9\n  display.set_pixel(x,y,pixelState)\n  myTimer.start()
-WaitInRed --> WaitInGreen : \n Timeout /
-WaitInGreen: entry /\n  pixelState = 0\n  display.set_pixel(x,y,pixelState)\n  myTimer.start()
-WaitInGreen --> WaitInYellow :  \n Timeout /
-WaitInYellow: entry /\n  pixelState = 0\n  display.set_pixel(x,y,pixelState)\n  myTimer.start()
-WaitInYellow --> WaitInRed :  \n Timeout /
+WaitInRed --> WaitInGreen : Timeout /\n  display.set_pixel(x,y,0)
+
+WaitInGreen : entry /\n  clear()\n  display.set_pixel(x,y+2,9)\n  myTimer.start(timeInGreen = 1000ms)
+
+WaitInGreen --> WaitInYellow : Timeout /\n  display.set_pixel(x,y+2,0)
+
+WaitInYellow : entry /\n  clear()\n  display.set_pixel(x,y+1,9)\n  myTimer.start(timeInYellow = 500ms)
+
+WaitInYellow --> WaitInRed : Timeout /\n  display.set_pixel(x,y+1,0)
+
 @enduml
+
 ```
 ## Bitácora de aplicación 
 
 
 
 ## Bitácora de reflexión
+
 
