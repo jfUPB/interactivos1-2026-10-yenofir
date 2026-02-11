@@ -42,14 +42,101 @@ elif ev == "Timeout":
             display.set_pixel(self.x,self.y,self.pixelState)
 ```
 
-**1.** El brillo del pixel baja a 0 o sube a 9.
+**1.** El brillo del pixel baja a 0 o sube a 9. 
 
 **2.** Reinicia el mismo temporizador. 
 
 **3.** Actualiza el display ```display.set_pixel(self.x,self.y,self.pixelState) ```
 
+## Actividad 02
+### Modificación Código Evento "A"
+```
+from microbit import*
+import utime
+from fsm import Timer, FSMTask, ENTRY
+
+class Semaforo(FSMTask):
+	def __init__(self,_x,_y,_timeInRed,_timeInGreen,_timeInYellow):
+		super().__init__()
+		self.x = _x
+		self.y = _y
+		self.timeInRed = _timeInRed
+		self.timeInGreen = _timeInGreen
+		self.timeInYellow = _timeInYellow
+		self.myTimer = self.add_timer("Timeout",self.timeInRed)
+		    self.transition_to(self.estado_waitInRed)
+	
+	def clear(self): #No es un estado, es una función utilitaria para apagar los leds.
+	    display.set_pixel(self.x,self.y,0)
+	    display.set_pixel(self.x,self.y+1,0)
+	    display.set_pixel(self.x,self.y+2,0)
+	
+	def estado_waitInRed(self, ev):
+	    if ev == "ENTRY":
+	        self.clear()
+	        display.set_pixel(self.x,self.y,9)
+	        self.myTimer.start(self.timeInRed)
+	    if ev == "Timeout":
+	        display.set_pixel(self.x,self.y,0)
+	        self.transition_to(self.estado_waitInGreen)
+	
+	
+	def estado_waitInGreen(self, ev):
+	    if ev == "ENTRY":
+	        self.clear()
+	        display.set_pixel(self.x,self.y+2,9)
+	        self.myTimer.start(self.timeInGreen)
+	        
+	    if ev == "Timeout":
+	        display.set_pixel(self.x,self.y+2,0)
+	        self.transition_to(self.estado_waitInYellow)
+	
+	    if ev == "A":
+	        display.set_pixel(self.x,self.y+2,0)
+	        self.transition_to(self.estado_waitInYellow)
+	
+	def estado_waitInYellow(self, ev):
+	    if ev == "ENTRY":
+	        self.clear()
+	        display.set_pixel(self.x,self.y+1,9)
+	        self.myTimer.start(self.timeInYellow)
+	
+	    if ev == "Timeout":
+	        display.set_pixel(self.x,self.y+1,0)
+	        self.transition_to(self.estado_waitInRed)
+
+            semaforo1 = Semaforo(0,0,2000,1000,500)
+            
+            while True:
+            #IMPUT PROCESIN
+            
+            if button_a.was_pressed(): semaforo1.post_event("A")
+            semaforo1.update()
+            utime.sleep_ms(20)
+
+```
+### Máquina de estados
+<img width="342" height="605" alt="image" src="https://github.com/user-attachments/assets/af8cb4e4-9c90-4132-ba83-c335470175be" />
+
+Implementación plantUML 
+```
+@startuml
+
+
+title Pixel - UML State Machine
+
+[*] --> WaitInRed : Pixel() (constructor)
+WaitInRed : entry /\n  pixelState = 9\n  display.set_pixel(x,y,pixelState)\n  myTimer.start()
+WaitInRed --> WaitInGreen : \n Timeout /
+WaitInGreen: entry /\n  pixelState = 0\n  display.set_pixel(x,y,pixelState)\n  myTimer.start()
+WaitInGreen --> WaitInYellow :  \n Timeout /
+WaitInYellow: entry /\n  pixelState = 0\n  display.set_pixel(x,y,pixelState)\n  myTimer.start()
+WaitInYellow --> WaitInRed :  \n Timeout /
+@enduml
+```
 ## Bitácora de aplicación 
 
 
 
 ## Bitácora de reflexión
+
