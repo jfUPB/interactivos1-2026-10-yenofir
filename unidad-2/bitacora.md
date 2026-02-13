@@ -449,7 +449,8 @@ while True:
     utime.sleep_ms(20)
 ```
 
-<img width="783" height="519" alt="image" src="https://github.com/user-attachments/assets/5176b6b6-8f61-40a8-b114-cd52bd48f7b1" />
+<img width="760" height="519" alt="image" src="https://github.com/user-attachments/assets/59c24c13-891e-47a6-8f8b-67e840c752e6" />
+
 
 Fuente del diagrama anterior:
 
@@ -460,14 +461,17 @@ title Temporizador - UML State Machine
 [*] --> Configuracion : Task() (constructor)
 
 Configuracion : entry /\n display.show(FILL[seconds])
+
 Configuracion --> Configuracion : A / +1 segundo (≤25)
+
 Configuracion --> Configuracion : B / -1 segundo (≥15)
+
 Configuracion --> Conteo : S /
 
 Conteo : entry /\n display.show(FILL[seconds])\n myTimer.start(1000)
-Conteo --> Conteo : Timeout /\n seconds--\n if seconds > 0: myTimer.start(1000)
+Conteo --> Conteo : S / Timeout /\n seconds--\n if seconds > 0: myTimer.start(1000)
 Conteo --> Alarma : Timeout / [seconds ≤ 0]
-Conteo --> Conteo : S /
+
 
 Alarma : entry /\n display.show(Image.SKULL)\n // sonido alarma
 Alarma --> Configuracion : A /\n seconds = 20
@@ -477,6 +481,7 @@ Alarma --> Configuracion : A /\n seconds = 20
 ```
 
 ## Bitácora de reflexión
+
 
 
 
