@@ -141,10 +141,128 @@ WaitInYellow --> WaitInRed : Timeout /\n  display.set_pixel(x,y+1,0)
 @enduml
 
 ```
+
+## ACTIVIDAD 3
+
+- ¿Cómo es posible estructurar una aplicación usando una máquina de estados para poder atender varios eventos de manera concurrente?
+
+Tenemos unos objetos de clase Timer que se actualizan constantemente, sin pausar el programa. En lugar de usar sleep() directamente en los estados, se usan temporizadores que se chequean en cada ciclo. Esto permite que el programa siga corriendo y detecte eventos externos (como botones) mientras "espera".
+```
+class Timer:
+    def __init__(self, owner, event_to_post, duration):
+        self.owner = owner
+        self.event = event_to_post
+        self.duration = duration
+        self.start_time = 0
+        self.active = False
+
+    def start(self, new_duration=None):
+        if new_duration is not None:
+            self.duration = new_duration
+        self.start_time = utime.ticks_ms()
+        self.active = True
+
+    def stop(self):
+        self.active = False
+
+    def update(self):
+        if self.active:
+            if utime.ticks_diff(utime.ticks_ms(), self.start_time) >= self.duration:
+                self.active = False
+                self.owner.post_event(self.event)
+````
+
+Tenemos la `class Game:` que es nuetra máquina de estados.
+La máquina de estados, cuenta con 3 estados `waitInHeart` `waitInPacman` `waitInGhost` que al presionar el botón A, cambia. Inicializamos con una la lista de temporizadores y un temporizador reutilizable, tanto la duración de cada uno de los estados
+
+````
+class Game:
+    def __init__(self):
+        self.event_queue = []
+        self.timers = []
+        self.timeInHeart = 2500
+        self.timeInPacman = 1000
+        self.timeInGhost = 2000
+        self.myTimer = self.createTimer("Timeout",self.timeInHeart)
+
+        self.estado_actual = None
+        self.transicion_a(self.estado_waitInHeart)
+
+````
+En este mismo objeto encontramos `createTimer`para abstraer temporizadores que son reutilizables, `post_event`  luego tenemos una llamado a la lista de eventos pendientes, `update(self)` que es la actualización de todos los timers,  `transicion_a` son las acciones de salida y entrada de diferenctes eventos de acuerdo con el estado actual.
+````
+def createTimer(self,event,duration):
+        t = Timer(self, event, duration)
+        self.timers.append(t)
+        return t
+
+    def post_event(self, ev):
+        self.event_queue.append(ev)
+
+    def update(self):
+        # 1. Actualizar todos los timers internos automáticamente
+        for t in self.timers:
+            t.update()
+
+        # 2. Procesar la cola de eventos resultante
+        while len(self.event_queue) > 0:
+            ev = self.event_queue.pop(0)
+            if self.estado_actual:
+                self.estado_actual(ev)
+
+    def transicion_a(self, nuevo_estado):
+        if self.estado_actual: self.estado_actual("EXIT")
+        self.estado_actual = nuevo_estado
+        self.estado_actual("ENTRY")
+````
+Deinimos los estados que tienen unos eventeos: sáldia ENTRY, un Timeup que llama el temporizador para hacer la transición al otro esado. y la presión del botón A que activa la transición a otro estado.
+````
+def estado_waitInHeart(self, ev):
+        if ev == "ENTRY":
+            display.show(Image.HEART)
+            self.myTimer.start(self.timeInHeart)
+        if ev == "Timeout":
+            self.transicion_a(self.estado_waitInPacman)
+        if ev == "A":
+            self.transicion_a(self.estado_waitInGhost)
+
+
+    def estado_waitInPacman(self, ev):
+        if ev == "ENTRY":
+            display.show(Image.PACMAN)
+            self.myTimer.start(self.timeInPacman)
+        if ev == "Timeout":
+            self.transicion_a(self.estado_waitInGhost)
+        if ev == "A":
+            self.transicion_a(self.estado_waitInHeart)
+
+    def estado_waitInGhost(self, ev):
+        if ev == "ENTRY":
+            display.show(Image.GHOST)
+            self.myTimer.start(self.timeInGhost)
+        if ev == "Timeout":
+            self.transicion_a(self.estado_waitInHeart)
+        if ev == "A":
+            self.transicion_a(self.estado_waitInPacman)
+  ````
+Para el cierre, tenemos el bucle `while True` que verifica si se presionó el botón A y postea el evento "A" si es así, llama a game.update() para procesar todo y duerme 20 ms (utime.sleep_ms(20)) para evitar consumir CPU innecesariamente, pero lo suficientemente corto para responder rápidamente a eventos.
+  ````
+while True:
+    if button_a.was_pressed():
+        game.post_event("A")
+    game.update()
+    utime.sleep_ms(20)
+  ````
+
+- ¿Cómo haces para probar que el programa está correcto?
+
+Observando si los estados y los eventos funcionan bien el microbit, compararando a su vez con nuestra gráfica UML que muestra los eventos y estados esperados.
+
 ## Bitácora de aplicación 
 
 
 
 ## Bitácora de reflexión
+
 
 
