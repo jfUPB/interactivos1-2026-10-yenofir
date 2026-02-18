@@ -3,6 +3,9 @@
 ## Bitácora de proceso de aprendizaje
 ### Actividad 01
 
+De acuerdo a los estados anteriores generamos un estado nocturno que tiene una condición que encendía el pixel o lo apagaba, generando una repetición en el encentido y apagado del pixel. 
+Se agregaron 2 Eventos más, el evento del botón A y el botón B. A - ir a modo peaton B modo nocturno.
+
 ````
 from microbit import *
 import utime
@@ -151,3 +154,4 @@ while True:
 
 
 ## Bitácora de reflexión
+
