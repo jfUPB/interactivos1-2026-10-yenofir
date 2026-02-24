@@ -3,9 +3,42 @@
 ## Bitácora de proceso de aprendizaje
 ### Actividad 01
 
-De acuerdo a los estados anteriores generamos un estado nocturno que tiene una condición que encendía el pixel o lo apagaba, generando una repetición en el encentido y apagado del pixel. 
-Se agregaron 2 Eventos más, el evento del botón A y el botón B. A - ir a modo peaton B modo nocturno.
+De acuerdo a los estados anteriores generamos un estado nocturno que tiene una condición que encendía o apagaba el pixel, generando una repetición en el encendido y apagado del pixel.
 
+Además, generamos el evento 'A' dentro del estado nocturno para realizar una transición al semáforo en el pixel amarillo:
+
+````
+def estado_nocturno(self,ev):
+        if ev == "ENTRY":
+            self.clear()
+            display.set_pixel(self.x,self.y+1,9)
+            self.myTimer.start(self.timeInYellow)
+
+        if ev == "Timeout":
+            if display.get_pixel(self.x,self.y+1) == 0:
+                display.set_pixel(self.x,self.y+1,9)
+                
+            else:
+                display.set_pixel(self.x,self.y+1,0)
+                
+            self.myTimer.start(self.timeInYellow)
+        
+        if ev == "A":
+            self.transicion_a(self.estado_waitInYellow)
+
+````
+Se agregaron 2 Eventos más en el `estado_waitInGreen` , el evento del botón A y el botón B. 
+**A** - ir a modo peaton **B** - modo nocturno:
+
+````
+if ev == "A":
+            self.transicion_a(self.estado_waitInYellow)
+
+        if ev == "B":
+            self.transicion_a(self.estado_nocturno)
+````
+
+Entonces el código completo en el **main.py** quedaría así:
 ````
 from microbit import *
 import utime
@@ -149,9 +182,48 @@ while True:
 
 ````
 ### Actividad 02
-Para solucionar la opción uno lo hicimos con una condición  en el estado de armado, esta condición llama el timer y le dice que si se presiona el 
+#### Solución Punto 1
+Modificamos el temporizador, necesitamos una orden que nos permita pausar el conteo, en la solicitud se espera que sea con el botón A, sin embargo, este será un problema cuando realicemos la solicitud 2.
 
-Estado que espera que pase algo. y así con el evento a puedo pasar y estado pausao o de conteo.
+En el estado de configuración añadimos un evento que nos hace la transición al estado de armado. Donde inicia el conteo regresivo.
+
+````
+if ev == "S":
+            self.transition_to(self.estado_armed)
+````
+
+Para pausar el conteo hicimos con un evento en el estado de armado, el cual tiene una condición que llama el timer y le dice que si se usa la función 'S' el temporizador se pausara o se renaudara.
+
+````
+if ev == "S":
+            if self.myTimer.active == False:
+                self.myTimer.start()
+            else:
+                self.myTimer.stop()
+````
+
+#### Solución Punto 2
+
+Primero creamos una secuencia que nos almacenará los datos de los botones presionados y definimos la contraseña de acceso para habilitar de nuevo el estado de configuración:
+````
+self.sequence = []
+self.myPassword = ["A", "B", "A"]
+````
+
+También añadimos el evento de la secuencia de botones A-B-A, el temporizador debe volver a modo de configuración. 
+
+El evento me dice que  hace la lectura de los botones presionados y guarda estos datos `self.sequence.append(ev)` , nos dice que si son igual a 3 y son los datos de la contraseña (A-B-A) nos lleva al estado de configuración, si no limpia la secuencia para que podamos volver a ingresar dicha contraseña, por ende solo nos permite pasar al estado de configuración presionando los botones en la secuencia correcta.
+
+````
+if ev == "A" or ev == "B":
+            self.sequence.append(ev)
+            if len(self.sequence) == 3:
+                if self.sequence == self.myPassword:
+                    self.transition_to(self.estado_config)
+                else:
+                    self.sequence.clear()
+````
+Entonces el main.py quedaría así:
 
 ```
 from microbit import *
@@ -245,5 +317,6 @@ while True:
 
 
 ## Bitácora de reflexión
+
 
 
