@@ -626,6 +626,8 @@ function windowResized() {
 
 ### ACTIVIDAD 04
 
+Al presionar los botones le estaba enviando a p5.js con print la presión de cada botón en el microbit. Por ende en usos más generales de acuerdo al sistema lo ideal es usar uart.write ya que nos permite finalizar el mensaje enviado de acuerdo con el sistema que lo reciba, en este caso sería '\n' ya que es JavaScrip.
+
 **Código Microbit:**
 
 ```
@@ -1350,6 +1352,7 @@ function windowResized() {
 
 
 ## Bitácora de reflexión
+
 
 
 
