@@ -312,11 +312,323 @@ while True:
     utime.sleep_ms(20)
 
 ```
+
+### Actividad 03
+
+Trabajamos con varios archivos:
+
+**index.html** → La estructura base que une todo
+
+**style.css** → El aspecto visual de la página
+
+**fsm.js** → La máquina de estados
+
+**sketch.js**→ El temporizador en sí y todo lo visual
+
+**jsconfig.json** → Configuración técnica para VS Code
+
+#### index.html: El index nos une todo
+
+```
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>Sketch</title>
+
+    <link rel="stylesheet" type="text/css" href="style.css">
+
+    <!-- Carga la librería de P5, desde internet. -->
+
+    <script src="https://cdn.jsdelivr.net/npm/p5@1.11.11/lib/p5.js"></script>
+  </head>
+
+  <body>
+
+    <!-- En este caso importa el orden porque el código carga línea a línea, quiere decir que en los siguiente scripts, primero llama al fsm.js que es la máquina de estados, es decir nuestro Cerebro
+    Y por último nuestro el sketch ya que este usa elementos de la mádquina de estados fsm.js -->
+
+    <script src="fsm.js"></script>
+    <script src="sketch.js"></script>
+  </body>
+</html>
+
+```
+
+#### style.css : El estilo
+Elimina las margenes para que el canvas de P5 ocupe toda la pantalla sin bordes.
+
+```
+html, body {
+  margin: 0;
+  padding: 0;
+}
+
+canvas {
+  display: block;
+}
+```
+#### fsm.py : La máquina de estados
+Este archivo no define estados ni eventos concretos. Solo crea las herramientas para manejarlos. Es como construir el motor de un carro sin decidir aún a dónde va a ir.
+
+```
+const ENTRY = "ENTRY";
+const EXIT = "EXIT";
+
+// Este es un temporizador. Es el que hace la cuenta en 1000ms para que descuente un segundo y cuando termina le avisa a su dueño owner enviando un evento.
+// this es una palabra clave que hace referencia al objeto actual que está ejecutando el código o a quien "posee" la función.
+
+class Timer {
+  constructor(owner, eventToPost, duration) {
+    this.owner = owner;  // ¿A quién le avisa cuando termina?
+    this.event = eventToPost; // ¿Qué evento envía cuando termina?
+    this.duration = duration; // ¿Cuánto tiempo espera? (en milisegundos)
+    this.startTime = 0;
+    this.active = false;
+  }
+
+  start(newDuration = null) {
+    if (newDuration !== null) this.duration = newDuration;
+    this.startTime = millis(); // millis() es una función de P5 que dice cuántos milisegundos han pasado desde que arrancó el programa.
+    this.active = true;
+  }
+
+  stop() {
+    this.active = false;
+  }
+
+  update() {
+    if (this.active && millis() - this.startTime >= this.duration) { //La resta millis() - this.startTime mide cuánto tiempo ha transcurrido.
+      this.active = false;
+      this.owner.postEvent(this.event);
+    }
+  }
+}
+
+class FSMTask {
+  constructor() {
+    this.queue = []; // Lista de eventos pendientes
+    this.timers = []; // Lista de temporizadores
+    this.state = null; // Estado actual
+  }
+
+  postEvent(ev) {
+    this.queue.push(ev);
+  }
+
+  addTimer(event, duration) {
+    let t = new Timer(this, event, duration);
+    this.timers.push(t);
+    return t;
+  }
+
+  transitionTo(newState) {
+    if (this.state) this.state(EXIT); // Le dice al estado actual "saliste"
+    this.state = newState;
+    this.state(ENTRY); // Le dice al nuevo estado "entraste"
+    //Cada vez que cambias de estado, el estado anterior recibe un evento EXIT y el nuevo recibe un evento ENTRY. Esto permite ejecutar acciones específicas al entrar o salir de un estado.
+  }
+
+  update() {
+    for (let t of this.timers) { 
+      t.update(); // Revisa si algún timer terminó
+    }
+    while (this.queue.length > 0) {
+      let ev = this.queue.shift(); // Toma el primer evento pendiente
+      if (this.state) this.state(ev);  // Se lo manda al estado actual
+      // Este método se llama 60 veces por segundo (por P5) y es el que mantiene todo funcionando.
+    }
+  }
+}
+
+```
+`if (newDuration !== null) this.duration = newDuration;` 
+`!==` significa "es diferente de". Y null en JavaScript significa "no existe" o "está vacío intencionalmente". Entonces esto se lee: "si el nuevo valor que me pasaron no es vacío, úsalo".
+
+
+
+#### sketh.js : el temporizador + visual de este
+
+**Eventos** (definidos en el objeto `EVENTS`):
+
+- `DEC → "A"` → reducir el valor
+- `INC → "B"` → aumentar el valor
+- `START → "S"` → iniciar la cuenta
+- `TICK → "Timeout"` → señal de cada segundo
+
+
+```
+// El temporizador puede configurarse entre 15 y 25 segundos, con 20 como valor por defecto.
+const TIMER_LIMITS = { 
+  min: 15,
+  max: 25,
+  defaultValue: 20,
+};
+// Estos son todos los eventos posibles. A reduce, B aumenta, S inicia, y Timeout es el que manda el Timer cada segundo.
+const EVENTS = {
+  DEC: "A",
+  INC: "B",
+  START: "S",
+  TICK: "Timeout",
+};
+//-> NO ENTIENDO 
+const UI = {
+  dialSize: 250,
+  ringWeight: 20,
+  bigText: 100,
+  configText: 120,
+  helpText: 18,
+};
+
+
+// Esta clase hereda de FSMTask (con extends), lo que significa que tiene todo lo de FSMTask más sus propios estados:
+// HERENCIA:  Temporizador hereda de FSMTask. Eso significa que Temporizador ya tiene todo lo de FSMTask (la cola de eventos, los timers, el método update, etc.) sin repetir código.
+class Temporizador extends FSMTask {
+  constructor(minValue, maxValue, defaultValue) {
+    super(); // Llama al constructor de FSMTask -> NO ENTIENDO CÓMO
+    // -> Cuando Temporizador nace (se crea), también necesita que FSMTask inicialice sus propias cosas (la cola queue, la lista timers, el state). El super() es literalmente decirle: "oye FSMTask, ejecuta tu constructor primero". Sin esto, las cosas heredadas de FSMTask no existirían y el programa fallaría.
+
+
+    //this significa "este objeto en particular"
+    this.minValue = minValue; 
+    this.maxValue = maxValue;
+    this.defaultValue = defaultValue;
+    this.configValue = defaultValue;
+    this.totalSeconds = defaultValue;
+    this.remainingSeconds = defaultValue;
+    
+    this.myTimer = this.addTimer(EVENTS.TICK, 1000); // Timer de 1 segundo
+    this.transitionTo(this.estado_config); // Empieza en config
+
+  }
+
+  get currentState() { //-> NO ENTIENDO 
+    return this.state;
+  }
+
+  estado_config = (ev) => {
+    if (ev === ENTRY) {
+      this.configValue = this.defaultValue; // Resetea a 20
+    }
+    else if (ev === EVENTS.DEC) {
+      if (this.configValue > this.minValue) this.configValue--;  /* reduce el valor */ 
+    } else if (ev === EVENTS.INC) {
+      if (this.configValue < this.maxValue) this.configValue++; /* aumenta el valor */ 
+    } else if (ev === EVENTS.START) {
+      this.totalSeconds = this.configValue;
+      this.remainingSeconds = this.totalSeconds;
+      this.transitionTo(this.estado_armed);
+    }
+  };
+
+
+  estado_armed = (ev) => {
+    if (ev === ENTRY) {
+      this.myTimer.start(); // Arranca el timer de 1 segundo
+    } else if (ev === EVENTS.TICK) {
+      if (this.remainingSeconds > 0) {
+        this.remainingSeconds--; // Descuenta un segundo
+        if (this.remainingSeconds === 0) {
+          this.transitionTo(this.estado_timeout); // ¡Se acabó!
+        } else {
+          this.myTimer.start();  // Reinicia el timer para el próximo segundo
+        }
+      }
+    } else if (ev === EXIT) {
+      this.myTimer.stop(); // Para el timer al salir
+    }
+
+  };
+
+  estado_timeout = (ev) => {
+    if (ev === ENTRY) {
+      console.log("¡TIEMPO!");
+    } else if (ev === EVENTS.DEC) {
+      this.transitionTo(this.estado_config); // Vuelve al inicio con tecla A
+    }
+  }
+}
+
+let temporizador;
+const renderer = new Map();
+
+function setup() {
+  createCanvas(windowWidth, windowHeight);
+  temporizador = new Temporizador(
+    TIMER_LIMITS.min,
+    TIMER_LIMITS.max,
+    TIMER_LIMITS.defaultValue
+  );
+  textAlign(CENTER, CENTER);
+// El renderer es un mapa que asocia cada estado con su función de dibujo correspondiente. Si el estado es estado_config, dibuja la pantalla de configuración; si es estado_armed, dibuja el anillo animado, etc.
+  renderer.set(temporizador.estado_config, () => drawConfig(temporizador.configValue));
+  renderer.set(temporizador.estado_armed, () => drawArmed(temporizador.remainingSeconds, temporizador.totalSeconds));
+  renderer.set(temporizador.estado_timeout, () => drawTimeout());
+}
+
+function draw() {
+  temporizador.update(); // Actualiza la lógica
+  renderer.get(temporizador.currentState)?.();  // Dibuja según el estado
+}
+
+function drawConfig(val) {
+  background(20, 40, 80);
+  fill(255);
+  textSize(120);
+  text(val, width / 2, height / 2);
+  textSize(18);
+  fill(200);
+  text("A(-) B(+) S(start)", width / 2, height / 2 + 100);
+}
+
+function drawArmed(val, total) {
+  background(20, 20, 20);
+  let pulse = sin(frameCount * 0.1) * 10;
+
+  noFill();
+  strokeWeight(20);
+  stroke(255, 100, 0, 50);
+  ellipse(width / 2, height / 2, 250);
+
+  stroke(255, 150, 0);
+  let angle = map(val, 0, total, 0, TWO_PI);
+  arc(width / 2, height / 2, 250, 250, -HALF_PI, angle - HALF_PI);
+
+  fill(255);
+  noStroke();
+  textSize(100 + pulse);
+  text(val, width / 2, height / 2);
+}
+
+function drawTimeout() {
+  let bg = frameCount % 20 < 10 ? color(150, 0, 0) : color(255, 0, 0);
+  background(bg);
+  fill(255);
+  textSize(100);
+  text("¡TIEMPO!", width / 2, height / 2);
+}
+//Esta función escucha el teclado y traduce las teclas en eventos. Cuando conectes el Microbit, 
+// los botones físicos A y B harán exactamente lo mismo que las teclas A y B del teclado.
+
+function keyPressed() {
+  if (key === "a" || key === "A") temporizador.postEvent("A");
+  if (key === "b" || key === "B") temporizador.postEvent("B");
+  if (key === "s" || key === "S") temporizador.postEvent("S");
+}
+
+function windowResized() {
+  resizeCanvas(windowWidth, windowHeight);
+}
+
+```
 ## Bitácora de aplicación 
 
 
 
 ## Bitácora de reflexión
+
 
 
 
