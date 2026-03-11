@@ -129,13 +129,38 @@ function keyReleased() {
 }
 ```
 
-Con Bit Bash clonamos clonamos el repositorio  e instalamos el servidor bridgeServer. 
+Con Bit Bash clonamos el repositorio e instalamos el servidor bridgeServer. 
 Cuando no tenenos el promt [S]de la terminal activo no se puede ejecutar porque tenemos activa la terminal en otra cosa, es decir activo el servidor. **Para desactivar Ctrl+C → De esta manera podemos prender o apagar servidores.**
 
-Normalmente los servidores que muestra el browser es una dirección IP local. En nuestro caso lo hacemos a través de visual code.
+<img width="1418" height="415" alt="image" src="https://github.com/user-attachments/assets/c570503c-1a20-4d81-8679-429b63de8ca8" />
+
+
+Normalmente los servidores que muestra el browser es una dirección IP local. El servidor que vamos a usar se llama Node.js nos permite ejecutar en un computador como un escritorio.
+<img width="1613" height="937" alt="image" src="https://github.com/user-attachments/assets/2210912e-72b0-4515-b9ff-b96bad50e9bd" />
+
+En nuestro caso lo hacemos a través de visual code.
+
+**Adapter:**
+El adapter es el que hace que de acuerdo a como llega la información del serial la interprete para el servidor: 
+
+![image.png](attachment:fea651d4-3e09-455b-9e92-a8143b0fb41f:image.png)
+
+El servidor es el que recoge toda la información de las diferentes entradas: simulador, microbit y las saca con datos normalizados, gracias al adapter.
+
+Transmitimos los datos a través del WEBSOCKET: es un protocolo de transmición, permite hacer comunicaciones entre aplicaciones y browser. → Es el que informa al usuario en el código de bridgeServer.js
+
+Función main
+Es la que ejecuta el sofware, lo llama y si hay un error nos dice.
+
+```
+main().catch((e) => {
+  log.error("Fatal:", e);
+  process.exit(1);
+```
 
 ## Bitácora de aplicación 
 
 
 
 ## Bitácora de reflexión
+
