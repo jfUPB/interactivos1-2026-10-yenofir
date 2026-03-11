@@ -143,13 +143,18 @@ En nuestro caso lo hacemos a través de visual code.
 **Adapter:**
 El adapter es el que hace que de acuerdo a como llega la información del serial la interprete para el servidor: 
 
-![image.png](attachment:fea651d4-3e09-455b-9e92-a8143b0fb41f:image.png)
+<img width="443" height="215" alt="image" src="https://github.com/user-attachments/assets/dfb6db8e-9c94-4669-b0d1-6d374b69afd4" />
 
 El servidor es el que recoge toda la información de las diferentes entradas: simulador, microbit y las saca con datos normalizados, gracias al adapter.
 
+<img width="2584" height="1425" alt="image" src="https://github.com/user-attachments/assets/2a14310d-6cdb-4ee5-a539-127c0eec0f0c" />
+
+
 Transmitimos los datos a través del WEBSOCKET: es un protocolo de transmición, permite hacer comunicaciones entre aplicaciones y browser. → Es el que informa al usuario en el código de bridgeServer.js
 
-Función main
+
+**Función main**
+
 Es la que ejecuta el sofware, lo llama y si hay un error nos dice.
 
 ```
@@ -163,4 +168,5 @@ main().catch((e) => {
 
 
 ## Bitácora de reflexión
+
 
