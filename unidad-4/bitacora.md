@@ -821,7 +821,182 @@ function windowResized() {
 }
 
 ```
+ 
+**Creación de nuevo adaptador: MicrobitV2Adapter:** Basado en MicrobitAsciiAdapter
+El constructor, connect(), disconnect(), _onChunk(), _fail(), _closed(). Toda la infraestructura de comunicación serial es la misma porque el hardware físico es el mismo micro:bit.
+Solo parseV2Line reemplaza a parseCsvLine. Dentro de ella hay tres cambios concretos: verifica el $ inicial, separa por | en lugar de ,, y valida el checksum que no existía antes.
+
+>```
+const { SerialPort } = require("serialport");
+const BaseAdapter = require("./BaseAdapter");
+
+// Error personalizado para tramas mal formadas o con checksum inválido
+class ParseError extends Error { }
+
+function parseV2Line(line) {
+  // El protocolo nuevo inicia con $ y tiene este formato:
+  // $T:45020|X:-245|Y:12|A:1|B:0|CHK:258
+  // Primero verificamos que inicie con $
+  if (!line.startsWith("$")) throw new ParseError("Missing $ at start");
+
+  // Quitamos el $ inicial y separamos por | (pipe)
+  const parts = line.slice(1).split("|");
+
+  // Deben llegar exactamente 6 campos: T, X, Y, A, B, CHK
+  if (parts.length !== 6) throw new ParseError(`Expected 6 fields, got ${parts.length}`);
+
+  // Extraemos cada campo separando por : y tomando el valor (la segunda parte)
+  const T   = Number(parts[0].split(":")[1]);
+  const x   = Number(parts[1].split(":")[1]);
+  const y   = Number(parts[2].split(":")[1]);
+  const a   = Number(parts[3].split(":")[1]);
+  const b   = Number(parts[4].split(":")[1]);
+  const chk = Number(parts[5].split(":")[1]);
+
+  // Validamos que todos los valores sean números finitos
+  if ([T, x, y, a, b, chk].some(v => !Number.isFinite(v))) {
+    throw new ParseError("Non-numeric value in frame");
+  }
+
+  // Validamos rangos del acelerómetro, igual que el adaptador anterior
+  if (x < -2048 || x > 2047 || y < -2048 || y > 2047) {
+    throw new ParseError("Accelerometer out of expected range");
+  }
+
+  // Validamos que los botones sean 0 o 1
+  if (![0, 1].includes(a) || ![0, 1].includes(b)) {
+    throw new ParseError("Invalid button value — expected 0 or 1");
+  }
+
+  // Calculamos el checksum: suma de valores absolutos de X, Y, A y B
+  const expectedChk = Math.abs(x) + Math.abs(y) + Math.abs(a) + Math.abs(b);
+
+  // Si el checksum no coincide, la trama está corrupta — la descartamos
+  if (chk !== expectedChk) {
+    throw new ParseError(`Checksum mismatch: got ${chk}, expected ${expectedChk}`);
+  }
+
+  // Todo válido — emitimos el mismo objeto que emite MicrobitAsciiAdapter
+  // para que el servidor funcione sin cambios
+  return {
+    x: x | 0,
+    y: y | 0,
+    btnA: a === 1,
+    btnB: b === 1
+  };
+}
+
+
+class MicrobitV2Adapter extends BaseAdapter {
+  // Constructor idéntico al MicrobitAsciiAdapter — mismas propiedades
+  constructor({ path, baud = 115200, verbose = false } = {}) {
+    super();
+    this.path = path;
+    this.baud = baud;
+    this.port = null;
+    this.buf = "";
+    this.verbose = verbose;
+  }
+
+  // connect() es igual al del MicrobitAsciiAdapter — abre el puerto serial
+  async connect() {
+    if (this.connected) return;
+    if (!this.path) throw new Error("serialPort is required for microbitv2 device mode");
+
+    this.port = new SerialPort({
+      path: this.path,
+      baudRate: this.baud,
+      autoOpen: false,
+    });
+
+    await new Promise((resolve, reject) => {
+      this.port.open((err) => (err ? reject(err) : resolve()));
+    });
+
+    this.connected = true;
+    this.onConnected?.(`serial open ${this.path} @${this.baud}`);
+
+    // Escucha los mismos eventos del puerto — solo cambia qué función parsea
+    this.port.on("data", (chunk) => this._onChunk(chunk));
+    this.port.on("error", (err) => this._fail(err));
+    this.port.on("close", () => this._closed());
+  }
+
+  // disconnect() idéntico — limpia puerto, buffer y notifica
+  async disconnect() {
+    if (!this.connected) return;
+    this.connected = false;
+
+    if (this.port && this.port.isOpen) {
+      await new Promise((resolve, reject) => {
+        this.port.close((err) => {
+          if (err) reject(err);
+          else resolve();
+        });
+      });
+    }
+    this.port = null;
+    this.buf = "";
+    this.onDisconnected?.("serial closed");
+  }
+
+  getConnectionDetail() {
+    return `serial open ${this.path}`;
+  }
+
+  // _onChunk es igual al del MicrobitAsciiAdapter — acumula chunks hasta encontrar \n
+  // La única diferencia es que llama a parseV2Line en vez de parseCsvLine
+  _onChunk(chunk) {
+    this.buf += chunk.toString("utf8");
+
+    let idx;
+    while ((idx = this.buf.indexOf("\n")) >= 0) {
+      const line = this.buf.slice(0, idx).trim();
+      this.buf = this.buf.slice(idx + 1);
+
+      if (!line) continue;
+
+      try {
+        const parsed = parseV2Line(line);
+        this.onData?.(parsed);
+      } catch (e) {
+        if (e instanceof ParseError) {
+          // Registramos advertencia en consola pero NO desconectamos
+          // (trama corrupta es normal, no es un error grave)
+          if (this.verbose) console.log("Bad data:", e.message, "raw:", line);
+          else console.warn(`[MicrobitV2Adapter] Corrupt frame discarded: ${e.message}`);
+        } else {
+          this._fail(e);
+        }
+      }
+    }
+
+    if (this.buf.length > 4096) this.buf = "";
+  }
+
+  _fail(err) {
+    this.onError?.(String(err?.message || err));
+    this.disconnect();
+  }
+
+  _closed() {
+    if (!this.connected) return;
+    this.connected = false;
+    this.port = null;
+    this.buf = "";
+    this.onDisconnected?.("serial closed (event)");
+  }
+}
+
+module.exports = MicrobitV2Adapter;
+
+```
+
+
+```
+```
 ## Bitácora de reflexión
+
 
 
 
