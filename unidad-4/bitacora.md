@@ -607,7 +607,222 @@ main().catch((e) => {
 
 ### ACTIVIDAD 02
 
+**Código Microbit ajustado:** contiene el nuevo formato solicitado, pasamos de `data = "{},{},{},{}\n".format(xValue, yValue, aState,bState)` a `data = "$T:{}|X:{}|Y:{}|A:{}|B:{}|CHK:{}\n".format(t, xValue, yValue, aState, bState, chk)`
+
+```
+from microbit import *
+import utime
+
+uart.init(115200)
+display.set_pixel(0, 0, 9)
+
+while True:
+    xValue = accelerometer.get_x()
+    yValue = accelerometer.get_y()
+    aState = 1 if button_a.is_pressed() else 0
+    bState = 1 if button_b.is_pressed() else 0
+    t = utime.ticks_ms()
+    chk = abs(xValue) + abs(yValue) + abs(aState) + abs(bState)
+
+    # ÚNICO CAMBIO: formato nuevo con $, |, T y CHK
+    data = "$T:{}|X:{}|Y:{}|A:{}|B:{}|CHK:{}\n".format(t, xValue, yValue, aState, bState, chk)
+    uart.write(data)
+    sleep(100)
+```
+
+**Sketch.js ajustado:** 
+En updateLogic — antes mapeaba x/y a coordenadas de pantalla. Ahora mapea a las variables que necesita el arte: circleResolution para los lados del polígono y radius para el tamaño.
+En drawRunning — la estructura del draw() original quedó intacta. Solo se reemplazaron los controles: btnA en lugar del mouse izquierdo, btnB en lugar del teclado.
+
+```
+const EVENTS = {
+    CONNECT: "CONNECT",
+    DISCONNECT: "DISCONNECT",
+    DATA: "DATA",
+    KEY_PRESSED: "KEY_PRESSED",
+    KEY_RELEASED: "KEY_RELEASED",
+};
+
+class PainterTask extends FSMTask {
+    constructor() {
+        super();
+
+        this.rxData = {
+            x: 0,
+            y: 0,
+            btnA: false,
+            btnB: false,
+            prevA: false,
+            prevB: false,
+            ready: false,
+            circleResolution: 2, // cuántos lados tiene el polígono — controlado por eje Y
+            radius: 0            // tamaño del polígono — controlado por eje X
+        };
+
+        this.transitionTo(this.estado_esperando);
+    }
+
+    estado_esperando = (ev) => {
+        if (ev.type === "ENTRY") {
+            cursor();
+            console.log("Waiting for connection...");
+        } else if (ev.type === EVENTS.CONNECT) {
+            this.transitionTo(this.estado_corriendo);
+        }
+    };
+
+    estado_corriendo = (ev) => {
+        if (ev.type === "ENTRY") {
+            noCursor();
+            noFill();
+            background(255);
+            strokeWeight(2);
+            stroke(0, 25);
+            console.log("Microbit ready to draw");
+            this.rxData = {
+                x: 0,
+                y: 0,
+                btnA: false,
+                btnB: false,
+                prevA: false,
+                prevB: false,
+                ready: false,
+                circleResolution: 2,
+                radius: 0
+            };
+        }
+
+        else if (ev.type === EVENTS.DISCONNECT) {
+            this.transitionTo(this.estado_esperando);
+        }
+
+        else if (ev.type === EVENTS.DATA) {
+            this.updateLogic(ev.payload);
+        }
+
+        else if (ev.type === EVENTS.KEY_PRESSED) {
+            this.handleKeys(ev.keyCode, ev.key);
+        }
+
+        else if (ev.type === EVENTS.KEY_RELEASED) {
+            this.handleKeyRelease(ev.keyCode, ev.key);
+        }
+
+        else if (ev.type === "EXIT") {
+            cursor();
+        }
+    };
+
+    updateLogic(data) {
+        this.rxData.ready = true;
+        this.rxData.btnA = data.btnA;
+        this.rxData.btnB = data.btnB;
+
+        // El eje Y del acelerómetro controla cuántos lados tiene el polígono.
+        // En el original era: int(map(mouseY + 100, 0, height, 2, 10))
+        // Ahora el rango de entrada es el del acelerómetro (-2048 a 2047), misma salida (2 a 10)
+        this.rxData.circleResolution = int(map(data.y, -2048, 2047, 2, 10));
+
+        // El eje X del acelerómetro controla el radio del polígono.
+        // En el original era: mouseX - width/2
+        // Ahora el rango de entrada es el del acelerómetro (-2048 a 2047), misma salida (-width/2 a width/2)
+        this.rxData.radius = map(data.x, -2048, 2047, -width/1, width/2);
+
+        this.rxData.prevA = this.rxData.btnA;
+        this.rxData.prevB = this.rxData.btnB;
+    }
+}
+
+let painter;
+let bridge;
+let connectBtn;
+const renderer = new Map();
+
+function setup() {
+    createCanvas(720, 720);
+    background(255);
+    painter = new PainterTask();
+    bridge = new BridgeClient();
+
+    bridge.onConnect(() => {
+        connectBtn.html("Disconnect");
+        painter.postEvent({ type: EVENTS.CONNECT });
+    });
+
+    bridge.onDisconnect(() => {
+        connectBtn.html("Connect");
+        painter.postEvent({ type: EVENTS.DISCONNECT });
+    });
+
+    bridge.onStatus((s) => {
+        console.log("BRIDGE STATUS:", s.state, s.detail ?? "");
+    });
+
+    bridge.onData((data) => {
+        painter.postEvent({
+            type: EVENTS.DATA, payload: {
+                x: data.x,
+                y: data.y,
+                btnA: data.btnA,
+                btnB: data.btnB
+            }
+        });
+    });
+
+    connectBtn = createButton("Connect");
+    connectBtn.position(10, 10);
+    connectBtn.mousePressed(() => {
+        if (bridge.isOpen) bridge.close();
+        else bridge.open();
+    });
+
+    renderer.set(painter.estado_corriendo, drawRunning);
+}
+
+function draw() {
+    painter.update();
+    renderer.get(painter.state)?.();
+}
+
+function drawRunning() {
+    let mb = painter.rxData;
+
+    if (!mb.ready) return;
+
+    // btnA reemplaza mouseIsPressed && mouseButton == LEFT del original
+    if (mb.btnA) {
+        push();
+        translate(width / 2, height / 2);
+
+        // btnB reemplaza keyIsPressed del original
+        if (mb.btnB) {
+            fill(34, 45, 122, 20);
+        } else {
+            noFill();
+        }
+
+        // Estructura de dibujo idéntica al original —
+        // solo cambian las fuentes de circleResolution y radius
+        let angle = TAU / mb.circleResolution;
+        beginShape();
+        for (let i = 0; i <= mb.circleResolution; i++) {
+            let x = cos(angle * i) * mb.radius;
+            let y = sin(angle * i) * mb.radius;
+            vertex(x, y);
+        }
+        endShape();
+
+        pop();
+    }
+}
+
+function windowResized() {
+    resizeCanvas(windowWidth, windowHeight);
+}
+
+```
 ## Bitácora de reflexión
+
 
 
 
