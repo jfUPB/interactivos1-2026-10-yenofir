@@ -163,10 +163,451 @@ main().catch((e) => {
   process.exit(1);
 ```
 
+### Códigos anteriores con entendimiento más profundo:
+
+**01 BaseAdapter**
+```
+class BaseAdapter {
+  constructor() {
+    this.connected = false; // abrir la conexión con el hardware
+    this.onData = null;
+    this.onError = null;
+    this.onConnected = null;
+    this.onDisconnected = null; // cerrarla limpiamente
+  }
+/* async:son funciones asíncronas. 
+Eso significa que pueden "pausarse" mientras esperan algo (como que un puerto serial abra), sin bloquear el resto del programa. 
+*/
+  async connect() {
+    throw new Error("connect() not implemented");// Throw significa lanzar, en este caso  una señal de que algo salió mal 
+  }
+
+  async disconnect() {
+    throw new Error("disconnect() not implemented");
+  }
+
+  getConnectionDetail() {
+    throw new Error("getConnectionDetail() must be implemented by subclass");
+  }  
+
+  async handleCommand(_cmd) {
+    console.warn("handleCommand() not implemented for command", _cmd);
+    // Las subclases pueden o no sobreescribir, hacer lo que quieran ahí adentro, incluyendo cambiar lo que sale en consola.
+  }
+}
+
+module.exports = BaseAdapter;
+```
+
+**02 MicrobitAsciiAdapter**
+```
+const { SerialPort } = require("serialport");
+const BaseAdapter = require("./BaseAdapter"); // Hereda del Base Adapter.
+
+class ParseError extends Error { } // Esta línea crea un tipo de error personalizado
+// Crear ParseError es como tener etiquetas diferentes en tus carpetas — te permite reaccionar diferente según el tipo de problema.
+
+function parseCsvLine(line) { //  Parsear: toma texto crudo del serial y lo convierte en datos que JavaScript puede entender.
+  const values = line.trim().split(","); //Aquí es dónde se dice como se separan los valores.
+  if (values.length !== 4) throw new ParseError(`Expected 4 values, got ${values.length}`);
+
+  const x = Number(values[0]);
+  const y = Number(values[1]);
+  const btnA = String(values[2]).trim().toLowerCase();
+  const btnB = String(values[3]).trim().toLowerCase();
+
+  if (!Number.isFinite(x) || !Number.isFinite(y)) throw new ParseError("Invalid numeric data");
+  //  ¿este valor es un número real y finito? El ! lo invierte — si no es finito, lanza el error. Esto atrapa casos como que llegue "abc" o "NaN" por el serial en lugar de un número.
+ 
+  if (x < -2048 || x > 2047 || y < -2048 || y > 2047) throw new ParseError("Out of expected range");
+  // El acelerómetro del micro:bit tiene un rango físico limitado: de -2048 a 2047. Si llega un valor fuera de ese rango, algo salió mal — dato corrupto, ruido en el serial, etc. Esta línea lo rechaza.
+ 
+  if (!["true", "false"].includes(btnA) || !["true", "false"].includes(btnB)) throw new ParseError("Invalid button data");
+  // ["true", "false"].includes(btnA) pregunta: ¿btnA es exactamente la palabra "true" o "false"? Si llegó cualquier otra cosa — "1", "yes", "" — no es válido.
+  
+  return { x: x | 0, y: y | 0, btnA: btnA === "true", btnB: btnB === "true" }; //Una vez tenga los valores los empaqueto en esta línea para transmitir.
+//Entonces para responder tu pregunta directamente: sí, la información se transforma. Entra como texto crudo "102,-45,true,false" y sale como un objeto JavaScript limpio y tipado { x: 102, y: -45, btnA: true, btnB: false }.
+}
+
+
+class MicrobitAsciiAdapter extends BaseAdapter {
+  constructor({ path, baud = 115200, verbose = false } = {}) {
+    super();
+    this.path = path; // Dirección del puerto serial
+    this.baud = baud;// Velocidad del puerto
+    this.port = null;
+    this.buf = ""; // un buffer de texto para acumular datos del serial
+    this.verbose = verbose;
+  }
+
+  async connect() { // Este conect es muy parecido al otro. 
+    if (this.connected) return;
+    if (!this.path) throw new Error("serialPort is required for microbit device mode");
+
+    this.port = new SerialPort({
+      path: this.path,
+      baudRate: this.baud,
+      autoOpen: false,
+    });
+
+    await new Promise((resolve, reject) => {
+      this.port.open((err) => (err ? reject(err) : resolve())); //Se abre el puerto serial.
+    });
+
+    this.connected = true;
+    this.onConnected?.(`serial open ${this.path} @${this.baud}`);
+
+    this.port.on("data", (chunk) => this._onChunk(chunk)); //Onchunk es la que tiene el protocolo serial ASCII, cada que lleguen datos se activa esta función. 
+    this.port.on("error", (err) => this._fail(err));
+    this.port.on("close", () => this._closed()); // De acuerdo a la función se ejecuntan las otras funciones
+  } 
+
+  async disconnect() {
+    if (!this.connected) return;
+    this.connected = false;
+
+    if (this.port && this.port.isOpen) {
+      await new Promise((resolve, reject) => {
+        this.port.close((err) => {
+          if (err) reject(err);
+          else resolve();
+        });
+      });
+    }
+    this.port = null;
+    this.buf = "";
+    this.onDisconnected?.("serial closed");
+  }
+
+  getConnectionDetail() {
+    return `serial open ${this.path}`;
+  }
+
+  _onChunk(chunk) { // Cómo entrega los datos microbit? por partes, podría llegar en Chunks (partes)
+    this.buf += chunk.toString("utf8");
+
+    let idx; // variable idx que guardará la posición del \n dentro del buffer
+    while ((idx = this.buf.indexOf("\n")) >= 0) { // Este while se repite mientras haya un \n en el buffer
+      const line = this.buf.slice(0, idx).trim(); // Corta el buffer desde el inicio hasta justo antes del \n, obteniendo una línea completa. .trim() elimina espacios o caracteres invisibles sobrantes en los bordes.
+      this.buf = this.buf.slice(idx + 1); // Elimina del buffer la línea que ya se extrajo (más el \n)
+
+      if (!line) continue;
+
+      try {
+        const parsed = parseCsvLine(line);  // manda la línea a parseCsvLine() para validarla y transformarla en un objeto {x, y, btnA, btnB}
+        this.onData?.(parsed); //  Si todo salió bien, llama a onData para entregarle los datos
+      } catch (e) {
+        if (e instanceof ParseError) { // ParseError — dato mal formateado — simplemente lo registra en consola 
+          if (this.verbose) console.log("Bad data:", e.message, "raw:", line); 
+        } else {
+          this._fail(e); // error inesperado y grave, llama a _fail() que desconecta todo limpiamente.
+        }
+      }
+    }
+
+    if (this.buf.length > 4096) this.buf = "";
+    // Se limpia con this.buf = "" cuando algo salió muy mal — si el buffer acumuló más de 4096 caracteres sin encontrar ningún \n, significa que los datos están corruptos o el micro:bit dejó de enviar correctamente. 
+  }
+
+  _fail(err) { // Si hay un error no identificado se desconecta el adapter.
+    this.onError?.(String(err?.message || err)); //convierte el error en texto legible para humanos
+    // El ?. significa "si existe" — evita que el programa explote si err no tiene una propiedad .message
+    this.disconnect();
+  }
+/*
+Closed: esta función la llama el sistema operativo automáticamente cuando el 
+puerto se cierra de forma inesperada — por ejemplo si desconectas físicamente el cable USB. 
+No la llamas tú, el sistema te avisa.
+*/
+  _closed() {
+    if (!this.connected) return;
+    this.connected = false;
+    this.port = null;
+    this.buf = "";
+    this.onDisconnected?.("serial closed (event)");
+  }
+
+  /*
+ async writeLine(line):  envía datos hacia el micro:bit. Es la comunicación en sentido contrario
+El => es solo una forma corta de escribir una función, como una flecha que dice "cuando pase esto, haz esto otro".
+ */
+  async writeLine(line) {
+    if (!this.port || !this.port.isOpen) return;
+    await new Promise((resolve, reject) => {
+      this.port.write(line, (err) => (err ? reject(err) : resolve()));
+    });
+  }
+
+  /*
+Math.max y Math.min juntos limitan el valor a un rango válido. 
+Math.trunc elimina los decimales — 3.9 se convierte en 3.
+writeLine envía eso al micro:bit como texto: `LED,2,3,9\n`
+Que el micro:bit interpreta como "enciende el LED en posición x=2, y=3 con brillo 9"
+  */
+  async handleCommand(cmd) { // Recibe un comando desde el servidor y lo ejecuta en el micro:bit
+    if (cmd?.cmd === "setLed") { // setLed es el comando y es para enceder o apagar un led en el microbit
+      const x = Math.max(0, Math.min(4, Math.trunc(cmd.x)));
+      const y = Math.max(0, Math.min(4, Math.trunc(cmd.y)));
+      const v = Math.max(0, Math.min(9, Math.trunc(cmd.value)));
+      await this.writeLine(`LED,${x},${y},${v}\n`);
+    }
+  }
+}
+
+module.exports = MicrobitAsciiAdapter;
+// module.exports es la forma de decir "esto es lo que ofrezco al resto del sistema".
+```
+
+**03 bridgeServer**
+```
+
+//   Uso:
+//     node bridgeServer.js --device sim --wsPort 8081 --hz 30
+//     node bridgeServer.js --device microbit --wsPort 8081 --serialPort COM5 --baud 115200
+
+//   WS contract:
+//    * bridge To client:
+//        {type:"status", state:"ready|connected|disconnected|error", detail:"..."}
+//        {type:"microbit", x:int, y:int, btnA:bool, btnB:bool, t:ms}
+//    * client To bridge:
+//        {cmd:"connect"} | {cmd:"disconnect"}
+//        {cmd:"setSimHz", hz:30}
+//        {cmd:"setLed", x:2, y:3, value:9}
+
+
+const { WebSocketServer } = require("ws");
+const { SerialPort } = require("serialport");
+const SimAdapter = require("./adapters/SimAdapter");
+const MicrobitAsciiAdapter = require("./adapters/MicrobitASCIIAdapter");
+// const MicrobitBinaryAdapter = require("./adapters/MicrobitBinaryAdapter");
+
+const log = {
+  info: (...args) => console.log(`[${new Date().toISOString()}] [INFO]`, ...args),
+  warn: (...args) => console.warn(`[${new Date().toISOString()}] [WARN]`, ...args),
+  error: (...args) => console.error(`[${new Date().toISOString()}] [ERROR]`, ...args)
+}; // Son 3 funciones empaquedatas en una base de datos. Es un objeto con tres funciones para registrar mensajes en la consola. 
+// son los compartimentos — cada uno contiene una función. Para usar uno escribes `log.info("mensaje")`.
+// El objeto `log` **agrega automáticamente la hora y una etiqueta** antes del mensaje.
+
+function getArg(name, def = null) { // 
+  const i = process.argv.indexOf(`--${name}`);
+  if (i >= 0 && i + 1 < process.argv.length) return process.argv[i + 1];
+  return def;
+} // 
+
+function hasFlag(name) {
+  return process.argv.includes(`--${name}`); // Los backticks ` permiten insertar variables dentro de un texto. ${name} se reemplaza por el valor de name. Si name es "device", entonces `--${name}` se convierte en "--device"
+} //  verifica si una palabra aparece en la lista de argumentos, pero sin necesitar un valor después
+
+function nowMs() { return Date.now(); } // nowMs() Retorna la hora actual en milisegundos
+// ara marcar con timestamp cada mensaje enviado, para saber exactamente cuándo ocurrió.
+
+function safeJsonParse(s) {
+  try {
+    return JSON.parse(s);
+
+  } catch (e) {
+    log.warn("Failed to parse JSON: ", s, e);
+    return null;
+  }
+} // JSON es el formato de texto que usan el servidor y el navegador para comunicarse
+
+function broadcast(wss, obj) { // Esta función envía un mensaje a todos los navegadores conectados al servidor al mismo tiempo.
+  const text = JSON.stringify(obj); // JSON.stringify convierte un objeto JavaScript en texto JSON para poder enviarlo
+  for (const client of wss.clients) { //recorre cada cliente conectado
+    if (client.readyState === 1) client.send(text); // verifica que ese cliente sigue conectado y listo antes de enviarle algo.
+  }
+}
+
+
+function status(wss, state, detail = "") { // Envía mensajes de estado a todos los clientes con broadcast
+  broadcast(wss, { type: "status", state, detail, t: nowMs() }); // Mensaje en {}
+} 
+
+// Las constantes de configuración:
+const DEVICE = (getArg("device", "sim") || "sim").toLowerCase();// ¿qué dispositivo usamos? (sim o microbit)
+const WS_PORT = parseInt(getArg("wsPort", "8081"), 10);// ¿por qué puerta WebSocket escuchamos? (por defecto 8081)
+const SERIAL_PATH = getArg("serialPort", null); // SERIAL_PATH → ¿en qué puerto físico está el micro:bit? (ej: COM5)
+const BAUD = parseInt(getArg("baud", "115200"), 10); //  ¿a qué velocidad habla el serial?
+const SIM_HZ = parseInt(getArg("hz", "30"), 10);// ¿cuántas veces por segundo genera datos el simulador?
+const VERBOSE = hasFlag("verbose"); //  ¿imprimimos más detalles en consola?
+
+async function findMicrobitPort() {
+  const ports = await SerialPort.list();
+  const microbit = ports.find(p =>
+    p.vendorId && parseInt(p.vendorId, 16) === 0x0D28
+  );
+  return microbit?.path ?? null;
+} // Esta función busca automáticamente en qué puerto serial está conectado el micro:bit
+
+async function createAdapter() {
+  if (DEVICE === "microbit") {
+    const path = SERIAL_PATH ?? await findMicrobitPort();
+    if (!path) {
+      log.error("micro:bit not found. Use --serialPort to specify manually.");
+      process.exit(1);
+    }
+    log.info(`micro:bit found at ${path}`); // Lee el microbit si no nos dice que hay un error
+    return new MicrobitAsciiAdapter({ path, baud: BAUD, verbose: VERBOSE });
+  }
+
+  // if (DEVICE === "microbit-bin") {
+  //   const path = SERIAL_PATH ?? await findMicrobitPort();
+  //   if (!path) {
+  //     log.error("micro:bit not found. Use --serialPort to specify manually.");
+  //     process.exit(1);
+  //   }
+  //   return new MicrobitBinaryAdapter({ path, baud: BAUD });
+  // }
+
+  return new SimAdapter({ hz: SIM_HZ });
+} // Esta función decide qué adaptador crear según el dispositivo elegido.
+
+async function main() { // Se programan un monton de funciones 
+  const wss = new WebSocketServer({ port: WS_PORT }); // Aquí se abre la "puerta" WebSocket del servidor
+  log.info(`WS listening on ws://127.0.0.1:${WS_PORT} device=${DEVICE}`);
+// rea el servidor que estará escuchando conexiones entrantes desde el navegador, en el puerto que definiste antes (8081).
+
+  const adapter = await createAdapter(); // Aquí se crea la conexión entre el simulador y el adaptador o con conecto el microbit.
+
+
+  /* Los cuatro callbacks del adaptador:
+  En resumen, estas cuatro líneas conectan el mundo del hardware con el mundo del navegador */
+  adapter.onConnected = (detail) => { // Este onConnected es llamado del SimADAPTER Y EL SIME ADAPTER LLAMA EL Base adapter.
+    log.info(`[ADAPTER] Device Connected: ${detail}`);
+    status(wss, "connected", detail); // el servidor imprime en consola que conectó y avisa a todos los navegadores
+  };
+
+  adapter.onDisconnected = (detail) => {
+    log.warn(`[ADAPTER] Device Disconnected: ${detail}`);
+    status(wss, "disconnected", detail);
+  };// Cuando el dispositivo se desconecta avisa a todos los navegadores
+
+  adapter.onError = (detail) => {
+    log.error(`[ADAPTER] Device Error: ${detail}`);
+    status(wss, "error", detail);
+  }; // Si algo sale mal con el hardware, imprime el error y avisa a todos.
+
+  adapter.onData = (d) => {
+    broadcast(wss, {
+      type: "microbit",
+      x: d.x,
+      y: d.y,
+      btnA: !!d.btnA,
+      btnB: !!d.btnB,
+      t: nowMs(),
+    });
+  };/*
+ cada vez que llegan datos del micro:bit, los reempaqueta y los envía a todos los navegadores con broadcast
+  El !!d.btnA convierte cualquier valor a booleano estricto true/false — los !! son un truco corto para garantizar ese tipo.
+  */
+
+
+  status(wss, "ready", `bridge up (${DEVICE})`); // Aquí empieza a transmitir 
+
+  wss.on("connection", (ws, req) => {// wss Esta función que dice cuando alguien se conecte, quiere que ocurra todo lo que esta dento.
+  // ws almacena la información de cada uno de los clientes.
+  // Todo lo que está adentro se ejecuta cada vez que un navegador nuevo se conecta. ws es la conexión individual de ese cliente, req tiene info de la red como su dirección IP.
+    
+  
+  log.info(`[NETWORK] Remote Client connected from ${req.socket.remoteAddress}. Total clients: ${wss.clients.size}`);
+
+    const state = adapter.connected ? "connected" : "ready";
+
+    const detail = adapter.connected
+      ? adapter.getConnectionDetail()
+      : `bridge (${DEVICE})`;
+
+    ws.send(JSON.stringify({ type: "status", state, detail, t: nowMs() }));
+
+    ws.on("message", async (raw) => { // Escucha mensajes que llegan desde ese navegador.
+      const msg = safeJsonParse(raw.toString("utf8"));
+      if (!msg) return;
+
+      if (msg.cmd === "connect") {
+        log.info(`[NETWORK] Client requested adapter connect`);
+
+        if (adapter.connected) {
+          log.info(`[HW-POLICY] Adapter already open. Sending current status to incoming client.`);
+          ws.send(JSON.stringify({ type: "status", state: "connected", detail: adapter.getConnectionDetail(), t: nowMs() }));
+          return;
+        }
+        
+        try {
+          await adapter.connect();
+        } catch (e) {
+          const detail = `connect failed: ${e.message || e}`;
+          log.error(`[ADAPTER] ` + detail);
+          status(wss, "error", detail);
+        }
+        return;
+      }
+
+      if (msg.cmd === "disconnect") {
+        log.info(`[NETWORK] Client requested adapter disconnect`);
+        if (wss.clients.size > 1) {
+          log.info(`[HW-POLICY] Adapater kept open. Shared with ${wss.clients.size - 1} other active client(s).`);
+          ws.send(JSON.stringify({ type: "status", state: "disconnected", detail: "logical disconnect only", t: nowMs() }));
+          return;
+        }
+        
+        try {
+          await adapter.disconnect();
+        } catch (e) {
+          const detail = `disconnect failed: ${e.message || e}`;
+          log.error(`[ADAPTER] ` + detail);
+          status(wss, "error", detail);
+        }
+        return;
+      }
+
+      if (msg.cmd === "setSimHz" && adapter instanceof SimAdapter) { // cambia la velocidad del simulador en tiempo real.
+        log.info(`Setting Sim Hz to ${msg.hz}`);
+        await adapter.handleCommand(msg);
+        status(wss, "connected", `sim hz=${adapter.hz}`);
+        return;
+      }
+
+      if (msg.cmd === "setLed") { // envía el comando al micro:bit para encender un LED.
+        try {
+          await adapter.handleCommand?.(msg); // 
+        } catch (e) {
+          const detail = `command failed: ${e.message || e}`;
+          log.error(`[ADAPTER] ` + detail);
+          status(wss, "error", detail);
+        }
+        return;
+      }
+    });
+
+    ws.on("close", () => { // Se ejecuta cuando un navegador se desconecta
+      log.info(`[NETWORK] Remote Client disconnected. Total clients left: ${wss.clients.size}`);
+      if (wss.clients.size === 0) {
+        log.info("[HW-POLICY] No more remote clients. Auto-disconnecting adapter device to free resources...");
+        adapter.disconnect();
+      }
+    });
+  });
+
+  if (DEVICE === "sim") { // Si mi dispositivo, esta conectado es un simulador se conecta con el adapter.
+    // En este caso es para el simulador ¿Pero qué pasa si es microbit? 
+    // micro:bit no se conecta automáticamente — espera a que el navegador envíe el comando "connect" manualmente.
+    await adapter.connect();
+  }
+}
+
+main().catch((e) => {
+  log.error("Fatal:", e);
+  process.exit(1);
+}); // Ejecuta toda la función main()
+
+// El programa no termina hasta que se deje de ejecutar el servidor con la terminal. 
+```
 ## Bitácora de aplicación 
 
-
+### ACTIVIDAD 02
 
 ## Bitácora de reflexión
+
 
 
