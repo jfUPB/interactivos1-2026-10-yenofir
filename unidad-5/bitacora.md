@@ -30,6 +30,185 @@ El código se cerraba con una caracter de enter(\n), delimita el conjunto de dat
 
 Por que este es usado en el protocolo ASCII, y este caracter se puede confundir con el cierre o el final, por ende debemos utilizar framing, que marca el incio y cierre de un conjunto de datos. Además creamos un que es el calcula un valor total que damos para asegurar seguridad, es decir que si el valor total se cumple el conjunto de datos llego de manera correcta.
 
+
+## Actividad 2
+
+### Código de Adaptador Binario:
+
+```
+const { SerialPort } = require("serialport");
+const BaseAdapter = require("./BaseAdapter");
+
+// Byte de sincronización — marca el inicio de cada paquete binario.
+// 0xAA en hex = 170 en decimal.
+const HEADER = 0xAA;
+
+// Tamaño fijo de cada paquete en bytes:
+// 1 (header) + 2 (X) + 2 (Y) + 1 (btnA) + 1 (btnB) + 1 (checksum) = 8 bytes
+const PACKET_SIZE = 8;
+
+class MicrobitBinaryAdapter extends BaseAdapter {
+
+  // Constructor idéntico a los adaptadores anteriores.
+  // DIFERENCIA: this.buf es Buffer.alloc(0) — buffer de bytes vacío
+  // en lugar de "" — buffer de texto vacío.
+  constructor({ path, baud = 115200, verbose = false } = {}) {
+    super();
+    this.path = path; // Dirección del puerto serial
+    this.baud = baud; // Velocidad del puerto
+    this.port = null;
+    this.buf = Buffer.alloc(0); // Acumula bytes en lugar de texto
+    this.verbose = verbose;
+  }
+
+  // connect() idéntico a los adaptadores anteriores.
+  async connect() {
+    if (this.connected) return;
+    if (!this.path) throw new Error("serialPort is required for microbitBinary device mode");
+
+    this.port = new SerialPort({
+      path: this.path,
+      baudRate: this.baud,
+      autoOpen: false,
+    });
+
+    await new Promise((resolve, reject) => {
+      this.port.open((err) => (err ? reject(err) : resolve()));
+    });
+
+    this.connected = true;
+    this.onConnected?.(`serial open ${this.path} @${this.baud}`);
+
+    this.port.on("data", (chunk) => this._onChunk(chunk));
+    this.port.on("error", (err) => this._fail(err));
+    this.port.on("close", () => this._closed());
+  }
+
+  // disconnect() idéntico a los adaptadores anteriores.
+  async disconnect() {
+    if (!this.connected) return;
+    this.connected = false;
+
+    if (this.port && this.port.isOpen) {
+      await new Promise((resolve, reject) => {
+        this.port.close((err) => {
+          if (err) reject(err);
+          else resolve();
+        });
+      });
+    }
+    this.port = null;
+    this.buf = Buffer.alloc(0);
+    this.onDisconnected?.("serial closed");
+  }
+
+  getConnectionDetail() {
+    return `serial open ${this.path}`;
+  }
+
+  // _onChunk es donde vive TODA la lógica — framing, validación y parseo juntos.
+  // A diferencia de los adaptadores anteriores, no hay función externa de parseo
+  // porque en binario el framing y el parseo están completamente entrelazados:
+  // no puedes parsear sin antes haber encontrado el 0xAA y verificado el checksum.
+  _onChunk(chunk) {
+
+    console.log(`[CHUNK RECIBIDO] ${chunk.length} bytes: ${chunk.toString('hex').toUpperCase()}`);
+
+    // Acumulamos bytes con Buffer.concat.
+    // DIFERENCIA con ASCII: en texto era this.buf += chunk.toString("utf8")
+    // Aquí concatenamos bytes directamente sin convertir a texto.
+    this.buf = Buffer.concat([this.buf, chunk]);
+
+    // Procesamos todos los paquetes completos disponibles en el buffer.
+    while (this.buf.length >= PACKET_SIZE) {
+
+      // FRAMING PASO 1: buscamos el byte 0xAA — inicio del paquete.
+      // DIFERENCIA con ASCII: en texto buscábamos "\n" con indexOf("\n")
+      // Aquí buscamos el byte 0xAA con indexOf(0xAA).
+      const headerIdx = this.buf.indexOf(HEADER);
+
+      // Si no hay 0xAA en todo el buffer, descartamos todo — no hay nada útil.
+      if (headerIdx === -1) {
+        this.buf = Buffer.alloc(0);
+        break;
+      }
+
+      // Si el 0xAA no está al inicio, descartamos los bytes previos — son basura.
+      // Ejemplo: buffer = [01 FF AA 01 F4 ...] → descartamos [01 FF]
+      if (headerIdx > 0) {
+        this.buf = this.buf.slice(headerIdx);
+        continue;
+      }
+
+      // FRAMING PASO 2: tenemos 0xAA al inicio pero no suficientes bytes todavía.
+      // Esperamos más chunks antes de continuar.
+      if (this.buf.length < PACKET_SIZE) break;
+
+      // Tenemos 0xAA al inicio y exactamente 8 bytes — extraemos el paquete.
+      const packet = this.buf.slice(0, PACKET_SIZE);
+
+      // VALIDACIÓN DEL CHECKSUM: suma de bytes 1 a 6, módulo 256.
+      // buf.slice(1, 7) extrae los bytes de datos (sin header ni checksum).
+      // reduce() los suma acumulativamente desde 0.
+      // % 256 asegura que el resultado cabe en un byte (0 a 255).
+      const expectedChk = packet.slice(1, 7).reduce((sum, byte) => sum + byte, 0) % 256;
+      const receivedChk = packet.readUInt8(7);
+
+      if (expectedChk !== receivedChk) {
+        // Checksum inválido — paquete corrupto, lo descartamos silenciosamente.
+        // Avanzamos solo 1 byte para no perdernos el siguiente 0xAA válido.
+        if (this.verbose) console.log(`[MicrobitBinaryAdapter] Corrupt packet discarded: checksum mismatch got ${receivedChk}, expected ${expectedChk}`);
+        else console.warn(`[MicrobitBinaryAdapter] Corrupt packet discarded`);
+        this.buf = this.buf.slice(1);
+        continue;
+      }
+
+      // PARSEO: paquete válido — leemos los bytes en sus posiciones.
+      // readInt16BE lee 2 bytes con signo en Big Endian — para X e Y del acelerómetro.
+      // readUInt8 lee 1 byte sin signo — para los botones.
+      const x    = packet.readInt16BE(1); // bytes 1-2 → acelerómetro X
+      const y    = packet.readInt16BE(3); // bytes 3-4 → acelerómetro Y
+      const btnA = packet.readUInt8(5) === 1; // byte 5 → botón A como booleano
+      const btnB = packet.readUInt8(6) === 1; // byte 6 → botón B como booleano
+
+      // Emitimos el objeto — contrato idéntico al de todos los adaptadores anteriores.
+      // El servidor y el sketch no saben ni les importa que esto vino en binario.
+      this.onData?.({ x, y, btnA, btnB });
+
+      // Avanzamos el buffer exactamente PACKET_SIZE bytes — eliminamos el paquete procesado.
+      // DIFERENCIA con ASCII: en texto avanzábamos hasta el \n con slice(idx + 1).
+      // Aquí siempre avanzamos exactamente 8 bytes.
+      this.buf = this.buf.slice(PACKET_SIZE);
+    }
+
+    // Red de seguridad: buffer demasiado grande sin paquetes válidos — limpiamos.
+    if (this.buf.length > 4096) this.buf = Buffer.alloc(0);
+  }
+
+  _fail(err) {
+    this.onError?.(String(err?.message || err));
+    this.disconnect();
+  }
+
+  _closed() {
+    if (!this.connected) return;
+    this.connected = false;
+    this.port = null;
+    this.buf = Buffer.alloc(0);
+    this.onDisconnected?.("serial closed (event)");
+  }
+}
+
+module.exports = MicrobitBinaryAdapter;
+
+```
+
+Los cambios se dan más que todo:
+
+
+<img width="1865" height="980" alt="image" src="https://github.com/user-attachments/assets/93d73a3c-4a98-4e6d-bf6c-9162cb62a892" />
+
+
 ## Bitácora de aplicación 
 
 
