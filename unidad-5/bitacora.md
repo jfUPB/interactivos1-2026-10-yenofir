@@ -206,6 +206,17 @@ module.exports = MicrobitBinaryAdapter;
 ```
 
 Como esta en los comentarios del código, los nuevos cambios se dan principalmente en que hacemos framing, el parseo esta dentro del _OnChunk, en primera instancia acumulamos en el buffer el conjunto de datos y en esta misma función validamos que los datos incien con el header y que sean 8, para el cierre, también hacemos el checksum que valida que los datos sean correctos para enviarlos. En esta misma función hacemos leemos los datos en Big Endian y readUInt8 para los botones.
+
+| Método | Bytes | Rango | Uso típico |
+| --- | --- | --- | --- |
+| `readUInt8` | 1 | 0 a 255 | botones, checksum |
+| `readInt8` | 1 | -128 a 127 | valores pequeños con signo |
+| `readInt16BE` | 2 | -32768 a 32767 | acelerómetro X e Y |
+| `readUInt16BE` | 2 | 0 a 65535 | valores grandes sin signo |
+| `readInt32BE` | 4 | -2B a 2B | enteros grandes |
+| `readFloatBE` | 4 | decimal | sensores de precisión |
+| `readDoubleBE` | 8 | decimal grande | cálculos científicos |
+
 Así enviamos los datos a través del onData y cerramos con la validación de seguridad del buffer.
 
 
