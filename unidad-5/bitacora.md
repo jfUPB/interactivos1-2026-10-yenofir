@@ -452,17 +452,17 @@ main().catch((e) => {
 });
 
 ```
-El cambio principal se da eb qye se agrega una constante que llama al adaptador y creamos una condición de activación del protocolo binario:
+El cambio principal se da eb qye se agrega una constante que llama al adaptador y creamos una condición de activación del protocolo binario. Si el usuario arracon con microbitbinary, crea la constante path para buscar el puerto, si no lo encuentra imprime error. Si lo encuentra imprime donde lo encontro.
 
 ```
- if (DEVICE === "microbitv2") {
+ if (DEVICE === "microbitbinary") {
     const path = SERIAL_PATH ?? await findMicrobitPort();
     if (!path) {
       log.error("micro:bit not found. Use --serialPort to specify manually.");
       process.exit(1);
     }
-    log.info(`micro:bit V2 found at ${path}`);
-    return new MicrobitV2Adapter({ path, baud: BAUD, verbose: VERBOSE });
+    log.info(`micro:bit Binary found at ${path}`);
+    return new MicrobitBinaryAdapter({ path, baud: BAUD, verbose: VERBOSE });
   }
 
 ```
