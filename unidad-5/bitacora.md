@@ -31,6 +31,8 @@ El código se cerraba con una caracter de enter(\n), delimita el conjunto de dat
 Por que este es usado en el protocolo ASCII, y este caracter se puede confundir con el cierre o el final, por ende debemos utilizar framing, que marca el incio y cierre de un conjunto de datos. Además creamos un que es el calcula un valor total que damos para asegurar seguridad, es decir que si el valor total se cumple el conjunto de datos llego de manera correcta.
 
 
+## Bitácora de aplicación 
+
 ## Actividad 2
 
 ### Código de Adaptador Binario:
@@ -468,7 +470,7 @@ El cambio principal se da eb qye se agrega una constante que llama al adaptador 
 ```
 
 
-## Bitácora de aplicación 
+
 
 
 ## Bitácora de reflexión
