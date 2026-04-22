@@ -249,4 +249,41 @@ function drawRunning() {
   }
 ```
 
+### RECEPCIÓN, COLA TEMPORAL Y RENDERIZADO
+
+**RECEPCIÓN:** El mensaje llega en el estado corriendo del sketch. El evento entra a la cola ordenado por su timestamp.
+
+```
+if (msg.type === "strudel") {
+      painter.postEvent({
+        type: EVENTS.STRUDEL_EVENT,
+        payload: { ...msg.payload, timestamp: msg.timestamp },
+      });
+    }
+```
+**COLA TEMPORAL:**
+
+Se llama cada frame. El while saca todos los eventos cuyo momento ya llegó — puede ser 0, 1 o varios a la vez. Cuando saca uno, crea la animación con una posición aleatoria y el color correspondiente. La posición se fija aquí — no cambia mientras la animación vive.
+¿el primer evento de la cola tiene un timestamp menor o igual a Date.now()? Si sí, lo saca de la cola y crea la animación. Si no, espera al próximo frame.
+
+```
+processQueue() {
+    const now = Date.now();
+    while (this.eventQueue.length > 0 && now >= this.eventQueue[0].timestamp) {
+      const ev = this.eventQueue.shift();
+      this.activeAnimations.push({
+        startTime: ev.timestamp,
+        duration:  ev.delta * 1000,
+        type:      ev.sound,
+        soundType: ev.soundType,
+        x: random(width  * 0.2, width  * 0.8),
+        y: random(height * 0.2, height * 0.8),
+        color: getColorForSound(ev.sound),
+      });
+    }
+  }
+```
+
+**RENDERIZADO:**
+
 ## Bitácora de reflexión
