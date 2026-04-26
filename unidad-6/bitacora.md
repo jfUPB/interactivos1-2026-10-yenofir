@@ -286,4 +286,38 @@ processQueue() {
 
 **RENDERIZADO:**
 
+Para la animación tenemos un loop con `progress`es el que hace la animación de los elementos, cuando progress esta en 0.0 es cuando inicia la animación y cuando esta en 1.0 es por que ya la termino, siendo el tamaño y el alpha proporcional:
+
+progress = 0.0  →  inicio  (círculo pequeño, barra ancha, cuadro grande)
+progress = 0.5  →  mitad   (tamaño medio, alpha medio)
+progress = 1.0  →  final   (círculo grande, barra nada, cuadro nada, alpha 0)
+
+```
+for (let i = anims.length - 1; i >= 0; i--) {
+    const a        = anims[i];
+    const progress = (now - a.startTime) / a.duration;
+
+    if (progress <= 1.0) {
+      dibujarElemento(a, progress);
+    } else {
+      anims.splice(i, 1);
+    }
+  }
+```
+
+**PRUEBAS REALIZADAS PARA COMPROBAR ANIMACIÓN**
+
+De las primeras pruebas es que al cambiar el tiempo de los ciclos en Strudel `setcps(0.25)` que es un poco más lento, permitiera ver la visual mucho más lento y analizar que tan sincronizado esta todo.
+
+La otra prueba fue poner un `console.log` en el processqueue para que nos imprima el estado de la cola, con los eventos pendiendes:
+
+```
+processQueue() {
+  const now = Date.now();
+  // PRUEBA: imprime el estado de la cola cada 60 frames aprox.
+  if (frameCount % 60 === 0) {
+    console.log(`Cola: ${this.eventQueue.length} eventos pendientes`);
+  }
+```
+
 ## Bitácora de reflexión
