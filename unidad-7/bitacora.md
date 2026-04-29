@@ -81,6 +81,27 @@ type le dice al sistema qué clase de mensaje es. payload contiene lo que realme
 
 ### Cómo conectaste bridgeClient.js, FSMTask, updateLogic y drawRunning
 
+El bridge Client, es el que enruta los mensajes que vienen del Server, lo hace a través del mgs.type, que le da un tipo de mensaje a los datos de Strudel y a los datos de OSC:
+
+```
+// ── Eventos musicales de Strudel ──────────────────────────────────────
+      // { type:"strudel", timestamp:ms, payload:{ eventType, soundType, s, delta, ... } }
+      if (msg.type === "strudel") {
+        this._onData?.(msg);
+        return;
+      }
+
+      // ── Mensajes de control de Open Stage Control ─────────────────────────
+      // { type:"osc", payload:{ address:"/rgb_1", args:[255,120,30] }, t:ms }
+      // Son actualizaciones de estado persistente, no eventos temporizados.
+      if (msg.type === "osc") {
+        this._onData?.(msg);
+        return;
+      }
+    };
+```
+
+Luego el FSMTask recibe estos datos y allí definimos cuales son los eventos y los estados persistentes
 ### Cómo integraste ambas fuentes de datos en el mismo frontend
 
 ## Qué pruebas hiciste para verificar que el control paramétrico funciona sin romper la sincronización de Strudel
