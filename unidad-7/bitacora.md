@@ -14,7 +14,7 @@ Un estado persistente es el que se mantiene sin niguna modificación, por ejempl
 
 
 **¿Qué partes del sistema de la unidad 6 permanecen intactas en este nuevo caso?**
-Permanece el Bridge de Strudel, que corre de REPL Strudel a través del Web Socket en el localhost 8080, el cual envia los datos a p5.js a t
+Permanece nuestro adaptador Strudel que sigue recibiendo los mensajes y normalizando para el bridge; el bridgeServer, que es el que retransmite los mensajes recibidos de los adaptadores , el baseAdapter, que sigue manteniendo un contrato con todos los adaptadores de conexión, data y errores; en nuestro sketch se mantiene intactas las funciones que reciben la cola de Eventos de Strudel.
 
 
 **Si Open Stage Control fuera “el dispositivo” de esta unidad, ¿Cuál sería su protocolo?**
