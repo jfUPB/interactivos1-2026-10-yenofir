@@ -56,6 +56,9 @@ Y tener 2 entradas de mensajes que permitan leer Strudel y OSC a la vez y los pu
 
 ### Configuración Open Stage Control
 
+**port: 8086:** http://127.0.0.1:8086 y ves los controles RGB, fader y switch. Este es el puerto de la interfaz web.
+
+**send: ["127.0.0.1:9000"]** dónde envía los mensajes OSC cuando movemos un control.
 
 
 ### Qué widgets decidiste usar y por qué
