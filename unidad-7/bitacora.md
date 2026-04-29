@@ -58,24 +58,26 @@ Y tener 2 entradas de mensajes que permitan leer Strudel y OSC a la vez y los pu
 
 
 
-## Qué widgets decidiste usar y por qué
+### Qué widgets decidiste usar y por qué
 
-RGB: Que controla el color, a través de 3 datos como la referencia que veníamos manejando.
-FADER: Controla el tamaño de 0.5 a 2.0, que tan grande o pequeño es nuestro bombo.
-SWITCH:encendido o apagado
+**RGB**Que controla el color, a través de 3 datos como la referencia que veníamos manejando.
+
+**FADER:** Controla el tamaño de 0.5 a 2.0, que tan grande o pequeño es nuestro bombo.
+
+**SWITCH**encendido o apagado
 La elección de estos es para usar diferentes widgets.
 
 
-## Qué estructura final de mensaje decidiste usar para los controles
+### Qué estructura final de mensaje decidiste usar para los controles
 
 `{ type: "osc", payload: { address: "/rgb_1", args: [255, 120, 30] } }`
 
 type:"osc" permite que bridgeClient distinga este flujo del de Strudel sin mirar el contenido. address identifica qué control fue movido. args tiene los valores. 
 
 
-## Cómo conectaste bridgeClient.js, FSMTask, updateLogic y drawRunning
+### Cómo conectaste bridgeClient.js, FSMTask, updateLogic y drawRunning
 
-## Cómo integraste ambas fuentes de datos en el mismo frontend
+### Cómo integraste ambas fuentes de datos en el mismo frontend
 
 ## Qué pruebas hiciste para verificar que el control paramétrico funciona sin romper la sincronización de Strudel
 
