@@ -54,5 +54,19 @@ Y tener 2 entradas de mensajes que permitan leer Strudel y OSC a la vez y los pu
 
 ## Bitácora de aplicación 
 
+### Configuración Open Stage Control
+
+
+## Qué widgets decidiste usar y por qué
+
+## Qué estructura final de mensaje decidiste usar para los controles
+
+## Cómo conectaste bridgeClient.js, FSMTask, updateLogic y drawRunning
+
+## Cómo integraste ambas fuentes de datos en el mismo frontend
+
+## Qué pruebas hiciste para verificar que el control paramétrico funciona sin romper la sincronización de Strudel
+
+## Qué problemas encontraste y cómo los solucionaste
 
 ## Bitácora de reflexión
