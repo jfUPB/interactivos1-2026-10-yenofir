@@ -77,6 +77,7 @@ La elección de estos es para usar diferentes widgets.
 
 type:"osc" permite que bridgeClient distinga este flujo del de Strudel sin mirar el contenido. address identifica qué control fue movido. args tiene los valores. 
 
+type le dice al sistema qué clase de mensaje es. payload contiene lo que realmente importa. Cuando _updateControl recibe el mensaje, solo le interesa el payload
 
 ### Cómo conectaste bridgeClient.js, FSMTask, updateLogic y drawRunning
 
