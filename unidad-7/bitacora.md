@@ -1325,3 +1325,6 @@ $: stack(
 )
 ````
 ## Bitácora de reflexión
+
+
+<img width="1002" height="766" alt="image" src="https://github.com/user-attachments/assets/64704033-b6f1-4a50-a108-a8b52ca5f6bd" />
