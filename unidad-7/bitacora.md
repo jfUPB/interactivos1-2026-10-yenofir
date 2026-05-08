@@ -102,10 +102,120 @@ El bridge Client, es el que enruta los mensajes que vienen del Server, lo hace a
 ```
 
 Luego el FSMTask recibe estos datos y allí definimos cuales son los eventos y los estados persistentes
+
 ### Cómo integraste ambas fuentes de datos en el mismo frontend
 
-## Qué pruebas hiciste para verificar que el control paramétrico funciona sin romper la sincronización de Strudel
+La clave es que dentro de PainterTask los dos flujos nunca se mezclan:
 
-## Qué problemas encontraste y cómo los solucionaste
+Strudel → eventQueue → activación por timestamp → animación efímera
+OSC → controlState → valor que persiste hasta el próximo mensaje → drawRunning lo lee en cada frame
+
+El canvas ve los dos al mismo tiempo porque drawRunning consume ambos: procesa la cola para activar animaciones, y lee controlState para saber con qué color y tamaño dibujarlas.
+
+**STRUDEL:**
+
+````
+ processQueue() {
+    const now = Date.now();
+
+    while (this.eventQueue.length > 0 && now >= this.eventQueue[0].timestamp) {
+      const ev = this.eventQueue.shift();
+      this.activeAnimations.push({
+        startTime: ev.timestamp,
+        duration:  ev.delta * 1000,
+        type:      ev.sound,
+        soundType: ev.soundType,
+        x: random(width  * 0.2, width  * 0.8),
+        y: random(height * 0.2, height * 0.8),
+        // Color base se guarda aquí, pero bd lo sobreescribe en draw con controlState.
+        // Así el color del bombo es siempre el último recibido por OSC,
+        // no el que había cuando nació la animación.
+        color: getColorForSound(ev.sound),
+      });
+    }
+  }
+````
+
+**OSC:**
+
+````
+_updateControl({ address, args }) {
+    if (address === "/rgb_1") {
+      // RGB picker → color del bombo [r, g, b] en rango 0-255
+      this.controlState.bdColor = [
+        Number(args[0] ?? 255),
+        Number(args[1] ?? 0),
+        Number(args[2] ?? 80),
+      ];
+    }
+
+    if (address === "/size_1") {
+      // Slider → multiplicador de tamaño, acotado para evitar valores extremos
+      this.controlState.sizeMultiplier = constrain(Number(args[0] ?? 1.0), 0.5, 2.0);
+    }
+
+    if (address === "/trail_1") {
+      // Toggle → 1 = estela activa (background con alpha), 0 = flash (background limpio)
+      this.controlState.trailEnabled = Number(args[0]) === 1;
+    }
+  }
+````
+### Qué pruebas hiciste para verificar que el control paramétrico funciona sin romper la sincronización de Strudel
+
+Primero probamos con la velocidad del ciclo de Strudel, para enteder si la sincronización se mantenía.
+Validar que datos estan llegando a la terminal, incluso si son los mismos del HUB.
+
+### Qué problemas encontraste y cómo los solucionaste
+
+La aplicación estaba corriendo con 2 servidores, en 2 terminales, lo ideal era hacer correr la aplicación en una sola terminal. Por ende hicimos una modificación en el bridge Server, este realizo unos arreglos que envíaban un solo device corriendo Strudel + OSC. 
+
+````
+  // ── Modo principal: Strudel + OSC en una sola terminal ──────────────────
+  // Ambos adaptadores se amarran al mismo servidor WebSocket.
+  // El cliente los distingue por msg.type ("strudel" vs "osc").
+  // Solo necesitas un puerto WebSocket y una terminal.
+  if (DEVICE === "strudel+osc") {
+    log.info("Creando adaptador Strudel (ws://127.0.0.1:8080)");
+    log.info(`Creando adaptador OSC     (UDP :${OSC_PORT})`);
+    const adaptadorStrudel = new StrudelAdapter({ verbose: VERBOSE });
+    const adaptadorOSC     = new OSCAdapter({ port: OSC_PORT, verbose: VERBOSE });
+    return [ adaptadorStrudel, adaptadorOSC ];
+  }
+````
+Entonces la función crearAdaptadores() devuelve un array
+Antes devolvía un solo adaptador. Ahora devuelve una lista. Si el modo es "strudel", la lista tiene uno. Si es "strudel+osc", la lista tiene dos.
+Ambos adaptadores se amarran al mismo servidor WebSocket en el mismo puerto. El cliente ya sabe distinguirlos por msg.type.
+
+También realizamos ajustes en nuestro sketch, ya que antes había dos variables globales (bridge y bridgeOSC) apuntando a dos puertos distintos. Ahora hay una sola (bridge) apuntando al único puerto donde corre el servidor.
+
+````
+bridge.onData((msg) => {
+
+  if (msg.type === "strudel") {
+    painter.postEvent({
+      type: EVENTS.STRUDEL_EVENT,
+      payload: { ...msg.payload, timestamp: msg.timestamp },
+    });
+    return;
+  }
+
+  if (msg.type === "osc") {
+    painter.postEvent({
+      type: EVENTS.OSC_CONTROL,
+      payload: msg.payload,
+    });
+    return;
+  }
+
+  if (msg.type === "microbit") {
+    painter.postEvent({
+      type: EVENTS.MICROBIT_DATA,
+      payload: { x: msg.x, y: msg.y, btnA: msg.btnA, btnB: msg.btnB },
+    });
+    return;
+  }
+
+});
+````
 
 ## Bitácora de reflexión
