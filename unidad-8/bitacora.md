@@ -609,6 +609,19 @@ Pruebas de llegada de datos de todos los adaptadores:
 <img width="1084" height="284" alt="Captura de pantalla 2026-05-06 153821" src="https://github.com/user-attachments/assets/46074b4b-2da3-4df1-ba01-e0172eac16df" />
 
 ## Bitácora de aplicación 
+## ATIVIDAD 02
+
+## ACTIVIDAD 03
+### 01 | Diagrama de flujo de datos del sistema:
+<img width="912" height="1095" alt="Código - Diagrama" src="https://github.com/user-attachments/assets/1dd1fe70-4782-4fbf-89da-3b92c3139c75" />
+
+### 02 | Tabla de roles
+
+| | micro:bit | Strudel | Open Stage Control |
+| --- | --- | --- | --- |
+| **Qué controla** | Cambio de momento (btnB), ciclar fotos (btnA), scatter/navegación de imagen (acelerómetro) | Pulsos visuales por zona: bombo → cruz, bajo → anillos, metal → abanico, etc. | Color de la luz, escala global, feedback/blur, pixel size, zoom, selección de foto |
+| **Cómo entra** | Binario por USB Serial → `MicrobitBinaryAdapter` parsea el paquete de 8 bytes (header + X + Y + btnA + btnB + checksum) → normaliza a `{x, y, btnA, btnB}` → `bridgeServer` → WS → `bridgeClient` → evento `MICROBIT_DATA` | Strudel envía OSC-over-WebSocket a `ws://localhost:8080` → `StrudelAdapter` parsea `/dirt/play` con sus args planos `[clave, valor, ...]` → normaliza a `{soundType, s, orbit, delta, ...}` → `bridgeServer` → WS → evento `STRUDEL_EVENT` | Open Stage Control envía paquetes OSC UDP al puerto 9000 → `OSCAdapter` normaliza el mensaje a `{address, args}` → `bridgeServer` → WS → evento `OSC_CONTROL` |
+| **Por qué así** | El binario de 8 bytes es mucho más eficiente que el ASCII por serial: menos parseo, sin ambigüedad de fin de línea, checksum propio para detectar corrupción. La separación en adaptador significa que `bridgeServer` no sabe nada sobre serial. | Strudel ya habla OSC internamente (SuperDirt). El adaptador crea un servidor WS propio en el 8080 para que Strudel se conecte con `.osc()`, separado del WS principal en el 8081. Así no hay conflicto de puertos. | OSC UDP es el protocolo nativo de Open Stage Control. El adaptador lo normaliza antes de que llegue al sketch, que solo ve `address` y `args` — sin saber nada de UDP. |
 
 
 ## Bitácora de reflexión
