@@ -759,6 +759,12 @@ se modificó drawRunning para que Strudel y tickZones se ejecuten incluso en M2,
 
 se agregó control desde la interfaz OSC para seleccionar fotografías específicas sin depender solo del botón A del micro:bit, dando al performer más opciones de composición visual durante la ejecución.
 
+
+### Evidencias de ensayo
+<img width="3840" height="1080" alt="Captura de pantalla 2026-05-18 173350" src="https://github.com/user-attachments/assets/bf61a468-1260-4064-a2c6-ee590f7816d4" />
+<img width="1231" height="348" alt="Captura de pantalla 2026-05-18 154544" src="https://github.com/user-attachments/assets/1096013e-0bd9-4a13-afa6-1a6a9580c7f7" />
+
+
 ## ACTIVIDAD 03
 ### 01 | Diagrama de flujo de datos del sistema:
 <img width="912" height="1095" alt="Código - Diagrama" src="https://github.com/user-attachments/assets/1dd1fe70-4782-4fbf-89da-3b92c3139c75" />
@@ -770,6 +776,26 @@ se agregó control desde la interfaz OSC para seleccionar fotografías específi
 | **Qué controla** | Cambio de momento (btnB), ciclar fotos (btnA), scatter/navegación de imagen (acelerómetro) | Pulsos visuales por zona: bombo → cruz, bajo → anillos, metal → abanico, etc. | Color de la luz, escala global, feedback/blur, pixel size, zoom, selección de foto |
 | **Cómo entra** | Binario por USB Serial → `MicrobitBinaryAdapter` parsea el paquete de 8 bytes (header + X + Y + btnA + btnB + checksum) → normaliza a `{x, y, btnA, btnB}` → `bridgeServer` → WS → `bridgeClient` → evento `MICROBIT_DATA` | Strudel envía OSC-over-WebSocket a `ws://localhost:8080` → `StrudelAdapter` parsea `/dirt/play` con sus args planos `[clave, valor, ...]` → normaliza a `{soundType, s, orbit, delta, ...}` → `bridgeServer` → WS → evento `STRUDEL_EVENT` | Open Stage Control envía paquetes OSC UDP al puerto 9000 → `OSCAdapter` normaliza el mensaje a `{address, args}` → `bridgeServer` → WS → evento `OSC_CONTROL` |
 | **Por qué así** | El binario de 8 bytes es mucho más eficiente que el ASCII por serial: menos parseo, sin ambigüedad de fin de línea, checksum propio para detectar corrupción. La separación en adaptador significa que `bridgeServer` no sabe nada sobre serial. | Strudel ya habla OSC internamente (SuperDirt). El adaptador crea un servidor WS propio en el 8080 para que Strudel se conecte con `.osc()`, separado del WS principal en el 8081. Así no hay conflicto de puertos. | OSC UDP es el protocolo nativo de Open Stage Control. El adaptador lo normaliza antes de que llegue al sketch, que solo ve `address` y `args` — sin saber nada de UDP. |
+
+### 03 | Recorrido: Adapter -> bridgeServer -> bridgeClient -> FSMTask -> updateLogic -> drawRunning
+
+**Adapter** — Cada adaptador tiene una sola responsabilidad: hablar el idioma de su fuente y entregar un objeto normalizado. MicrobitBinaryAdapter habla serial binario. StrudelAdapter habla WS + JSON. OSCAdapter habla UDP + OSC. Todos entregan datos a bridgeServer llamando this.onData(normalizado).
+
+**bridgeServer** — Recibe de cualquier adaptador y hace broadcast a todos los clientes WebSocket conectados en el puerto 8081. Formatea el mensaje con formatBroadcast() si el adaptador lo define, o usa el formato microbit por defecto. No toma decisiones visuales — solo reenvía.
+
+**bridgeClient** — Corre en el navegador. Recibe el mensaje JSON del WS y lo enruta según msg.type: "microbit" → callback onData, "strudel" → onData, "osc" → onData. El sketch registra ese callback con bridge.onData(msg => ...).
+
+**FSMTask** — El sketch convierte cada mensaje en un evento tipado y lo postea a la FSM (MICROBIT_DATA, STRUDEL_EVENT, OSC_CONTROL). La FSM tiene dos estados: estado_esperando (ignora datos, muestra animación idle) y estado_corriendo (procesa todo). En estado_corriendo, cada tipo de evento llama al método correcto.
+
+**updateLogic** — Tres caminos paralelos, cada uno actualiza una parte del estado:
+
+`_updateMicrobit` → modifica activeVisual (btnB) o llama a ledVisual.handleMicrobit (btnA, acelerómetro)
+
+`processQueue`` → consume la cola de eventos Strudel ordenada por timestamp y llama a pulseZone("nucleus"), pulseZone("tracery"), etc.
+
+`_updateControl` → actualiza controlState.glassColor, waveSize, blurEnabled con los valores OSC
+
+**drawRunning** — Cada frame, p5.js llama draw(). Si la FSM está en estado_corriendo, se llama drawRunning(), que lee activeVisual, controlState y Z[zona].beat (que ya fueron actualizados por los tres caminos anteriores) y produce el visual. No recibe datos directamente — solo consume estado.
 
 
 ## Bitácora de reflexión
