@@ -2,7 +2,7 @@
 
 ## Bitácora de proceso de aprendizaje
 
-## ACTIVIDAD 01
+# ACTIVIDAD 01
 
 ### Arquitectura Inicial Propuesta 
 
@@ -609,8 +609,8 @@ Pruebas de llegada de datos de todos los adaptadores:
 <img width="1084" height="284" alt="Captura de pantalla 2026-05-06 153821" src="https://github.com/user-attachments/assets/46074b4b-2da3-4df1-ba01-e0172eac16df" />
 
 ## Bitácora de aplicación 
-## ATIVIDAD 02
-###  Concepto de la obra
+# ATIVIDAD 02
+##  Concepto de la obra
 La Iglesia es una performance de live coding audiovisual que usa la arquitectura visual y simbólica de una iglesia católica como materia prima para explorar tres estados de intensidad emocional: el orden representado (la nave, el vitral, la geometría sagrada), el cuerpo que sufre dentro de ese orden (los rostros, el llanto, el afán), y la violencia que lo funda (la crucifixión, la sangre, los clavos).
 
 El referente sonoro es el dark ambient industrial: instrumental oscuro, textura de ruido blanco que se densifica hacia el clímax. La performance no ilustra ni explica la iglesia —la procesa, la desfigura y la reconstruye en tiempo real.
@@ -638,7 +638,7 @@ La obra tiene tres capas de significado que corresponden a los tres niveles anot
 <img width="1600" height="1011" alt="image" src="https://github.com/user-attachments/assets/47082fbd-ab01-4101-a690-a95b57a8305a" />
 
 
-###  Rol de micro:bit, Strudel y Open Stage Control
+##  Rol de micro:bit, Strudel y Open Stage Control
 
 **Micro:bit**
 
@@ -688,7 +688,7 @@ OSC no activa eventos: sostiene el estado. El color de la luz, la escala del vit
 La cruz audio-reactiva sobre las fotografías requiere simultáneamente: que micro:bit (botón B) haya puesto el sistema en Momento 2, que OSC (/cruz_1) haya activado el overlay, y que Strudel esté enviando eventos bd que pulsen la zona nucleus. Ninguna de las tres fuentes por sí sola produce ese estado. Si el micro:bit está en M1, la cruz no aparece sobre las fotos aunque OSC la active. Si OSC no la activó, no aparece aunque el bd golpee. Si Strudel no envía bd, la cruz existe pero no pulsa. La imagen resultante —una fotografía de iglesia con una cruz luminosa que late al ritmo del bombo— es el producto de las tres fuentes en simultáneo.
 
 
-### Decisiones visuales, musicales y performáticas
+## Decisiones visuales, musicales y performáticas
 
 **Desiciones visuales**
 
@@ -723,7 +723,7 @@ Strudel se toca en vivo: el live coding es parte de la performance. El performer
 Open Stage Control se opera en paralelo, ajustando el estado del espacio: el color de la luz, la escala del vitral, la aparición de la cruz. Son decisiones de dirección artística tomadas en tiempo real.
 
 
-### Cambios realizados entre la iteración ingenieril y la iteración estética
+## Cambios realizados entre la iteración ingenieril y la iteración estética
 
 **Orbit como distinguidor de bass1/bass2:**
 
@@ -760,16 +760,16 @@ se modificó drawRunning para que Strudel y tickZones se ejecuten incluso en M2,
 se agregó control desde la interfaz OSC para seleccionar fotografías específicas sin depender solo del botón A del micro:bit, dando al performer más opciones de composición visual durante la ejecución.
 
 
-### Evidencias de ensayo
+## Evidencias de ensayo
 <img width="3840" height="1080" alt="Captura de pantalla 2026-05-18 173350" src="https://github.com/user-attachments/assets/bf61a468-1260-4064-a2c6-ee590f7816d4" />
 <img width="1231" height="348" alt="Captura de pantalla 2026-05-18 154544" src="https://github.com/user-attachments/assets/1096013e-0bd9-4a13-afa6-1a6a9580c7f7" />
 
 
-## ACTIVIDAD 03
-### 01 | Diagrama de flujo de datos del sistema:
+# ACTIVIDAD 03
+## 01 | Diagrama de flujo de datos del sistema:
 <img width="912" height="1095" alt="Código - Diagrama" src="https://github.com/user-attachments/assets/1dd1fe70-4782-4fbf-89da-3b92c3139c75" />
 
-### 02 | Tabla de roles
+## 02 | Tabla de roles
 
 | | micro:bit | Strudel | Open Stage Control |
 | --- | --- | --- | --- |
@@ -777,7 +777,7 @@ se agregó control desde la interfaz OSC para seleccionar fotografías específi
 | **Cómo entra** | Binario por USB Serial → `MicrobitBinaryAdapter` parsea el paquete de 8 bytes (header + X + Y + btnA + btnB + checksum) → normaliza a `{x, y, btnA, btnB}` → `bridgeServer` → WS → `bridgeClient` → evento `MICROBIT_DATA` | Strudel envía OSC-over-WebSocket a `ws://localhost:8080` → `StrudelAdapter` parsea `/dirt/play` con sus args planos `[clave, valor, ...]` → normaliza a `{soundType, s, orbit, delta, ...}` → `bridgeServer` → WS → evento `STRUDEL_EVENT` | Open Stage Control envía paquetes OSC UDP al puerto 9000 → `OSCAdapter` normaliza el mensaje a `{address, args}` → `bridgeServer` → WS → evento `OSC_CONTROL` |
 | **Por qué así** | El binario de 8 bytes es mucho más eficiente que el ASCII por serial: menos parseo, sin ambigüedad de fin de línea, checksum propio para detectar corrupción. La separación en adaptador significa que `bridgeServer` no sabe nada sobre serial. | Strudel ya habla OSC internamente (SuperDirt). El adaptador crea un servidor WS propio en el 8080 para que Strudel se conecte con `.osc()`, separado del WS principal en el 8081. Así no hay conflicto de puertos. | OSC UDP es el protocolo nativo de Open Stage Control. El adaptador lo normaliza antes de que llegue al sketch, que solo ve `address` y `args` — sin saber nada de UDP. |
 
-### 03 | Recorrido: Adapter -> bridgeServer -> bridgeClient -> FSMTask -> updateLogic -> drawRunning
+## 03 | Recorrido: Adapter -> bridgeServer -> bridgeClient -> FSMTask -> updateLogic -> drawRunning
 
 **Adapter** — Cada adaptador tiene una sola responsabilidad: hablar el idioma de su fuente y entregar un objeto normalizado. MicrobitBinaryAdapter habla serial binario. StrudelAdapter habla WS + JSON. OSCAdapter habla UDP + OSC. Todos entregan datos a bridgeServer llamando this.onData(normalizado).
 
