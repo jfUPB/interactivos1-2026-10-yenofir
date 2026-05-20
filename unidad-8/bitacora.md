@@ -791,11 +791,22 @@ se agregó control desde la interfaz OSC para seleccionar fotografías específi
 
 `_updateMicrobit` → modifica activeVisual (btnB) o llama a ledVisual.handleMicrobit (btnA, acelerómetro)
 
-`processQueue`` → consume la cola de eventos Strudel ordenada por timestamp y llama a pulseZone("nucleus"), pulseZone("tracery"), etc.
+`processQueue` → consume la cola de eventos Strudel ordenada por timestamp y llama a pulseZone("nucleus"), pulseZone("tracery"), etc.
 
 `_updateControl` → actualiza controlState.glassColor, waveSize, blurEnabled con los valores OSC
 
 **drawRunning** — Cada frame, p5.js llama draw(). Si la FSM está en estado_corriendo, se llama drawRunning(), que lee activeVisual, controlState y Z[zona].beat (que ya fueron actualizados por los tres caminos anteriores) y produce el visual. No recibe datos directamente — solo consume estado.
+
+## 04 | Justificación de la propuesta estética y performática.
+
+El recorrido busca habitar un espacio atmosférico construido en torno a la iglesia, contrastando su definición y mirada desde lo liminal, lo profundo, la perfección buscada en sus espacios y el sacrificio que conlleva alcanzarla. El vitral abre el camino —inicio, perfección geométrica, anhelo de lo divino—; las fotografías, en cambio, invitan a leer el desgaste, el sacrificio, el dolor y la sangre. Una tensión sostenida entre la forma idealizada y la materia que la sostiene.
+
+El sonido articula y guía este tránsito en tres momentos: intro, groove y clímax.
+
+## 05 | Evidencias de pruebas y ensayos.
+<img width="2666" height="1422" alt="image" src="https://github.com/user-attachments/assets/f2e75703-288d-4401-be19-182a7b7ce080" />
+<img width="1917" height="1031" alt="Captura de pantalla 2026-05-18 221904" src="https://github.com/user-attachments/assets/c8e1f1a2-0449-4833-a0d7-0dd9040f4a0a" />
+<img width="2638" height="1424" alt="image" src="https://github.com/user-attachments/assets/6cd840c3-5ec6-4685-84aa-8a24d1479709" />
 
 
 ## Bitácora de reflexión
